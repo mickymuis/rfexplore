@@ -18,7 +18,7 @@ export default class Viewport {
         this.viewportWidth = this.container.offsetWidth;
         this.viewportHeight = this.container.offsetHeight;
 
-        this._viewmode = 'folded'; // one of brick, diamond, circle, folded
+        this._viewmode = 'folded'; // one of 'brick', 'diamond', 'circle', 'folded'
         this._scene = null;
         this._aspect =1.0;
         this._cameraPersp = null;
@@ -40,12 +40,15 @@ export default class Viewport {
             node_count: 0,
             mesh: null,
             viewmode: null,
-            mode: 0
+            mode: 0,
+            input_nodes: null
         };
         this._animation = {
             animateGeometry: true,
+            mode: 'rows', //  one of 'rows', 'ordered'
             done: false,
-            node: { col:0, row: 0 }
+            node: { col:0, row: 0 },
+            row: 0
         };
     }
     render() {
@@ -62,7 +65,7 @@ export default class Viewport {
             return;
         requestAnimationFrame( ()=>{this.animate()} );
         this._controls.update();
-        this._populateNextNode();
+        this._updateCellsAnimated();
         this.render();
     }
 
@@ -193,22 +196,16 @@ export default class Viewport {
             console.log( 'Viewport: rebuilding geometry' );
             let populate = !this._animation.animateGeometry;
             this._updateGeometry( populate );
-            if( !populate ) {
-                this._animation.node = automaton.first();
-                this._animation.done = false;
-                this.animate();
-            }
         }
         else {
-            if( this._animation.animateGeometry ) {
-
-                this._updateCells( true );
-                this._animation.node = automaton.first();
-                this._animation.done = false;
-                this.animate();
-            }
-            else
+            if( !this._animation.animateGeometry )
                 this._updateCells();
+        }
+        if( this._animation.animateGeometry ) {
+            this._updateCells( true );
+            this._animation.node = automaton.first(); this._animation.row =0;
+            this._animation.done = false;
+            this.animate();
         }
         this.render();
     }
@@ -217,6 +214,10 @@ export default class Viewport {
     // Private functions
     //
     
+    
+    /*
+     * Set the geometry's color at position of node to color
+     */
     _setColor( node, color ) {
         let M = this._model;
         let n = M.template_size; // elements per template geometry
@@ -241,6 +242,21 @@ export default class Viewport {
         }
     }
 
+    /* 
+     * Given a col and row, return the color that represents the value
+     * of this node in the automaton
+     */
+    _nodeColor( node ) {
+        let color = this.backgroundColor;
+        let value = this.automaton.value( node );
+        if( value >= 0 ) 
+            color = this.palette[ value ];
+        return new THREE.Color( color );
+    }
+
+    /*
+     * Given a col and row, calculate the offset within the geometry
+     */
     _calcNodeOffset( { col, row } ) {
         // FIXME: add support for modes
         let width = this.automaton.width;
@@ -250,6 +266,9 @@ export default class Viewport {
         return rowoffs + col;
     }
 
+    /*
+     * Change the colors of the geometry such that it represents the current automaton 
+     */
     _updateCells( only_clean = false ) {
         const automaton =this.automaton;
         if( automaton === null )
@@ -259,11 +278,7 @@ export default class Viewport {
         if( !only_clean ) {
             for( let i =0; i < automaton.rows; i++ ) {
                 for( let j =0; j < automaton.rowLength(i); j++ ) {
-                    let color = this.backgroundColor;
-                    let value = automaton.value( { row: i, col: j });
-                    if( value >= 0 ) 
-                        color = this.palette[ value ];
-
+                    let color = this._nodeColor( { row: i, col: j } );
                     this._setColor( this._calcNodeOffset( { col: j, row: i } ), new THREE.Color( color ) );
 
                     node++;
@@ -278,28 +293,47 @@ export default class Viewport {
         this._model.attr_color.needsUpdate =true;
     }
 
-    _populateNextNode() {
+    /*
+     * Change the colors of the geometry such that it represents the current automaton,
+     * when animated, this function performs the next step in the animation.
+     */
+    _updateCellsAnimated() {
         const automaton =this.automaton;
         if( automaton === null )
             return;
 
-        let node = this._animation.node;
-        let color = this.backgroundColor;
-        let value = automaton.value( node );
-        if( value >= 0 ) 
-            color = this.palette[ value ];
+        if( this._animation.mode === 'ordered' ) {
+            let node = this._animation.node;
+            let color = this._nodeColor( node );
+            let offset = this._calcNodeOffset( node );
 
-        let offset = this._calcNodeOffset( node );
+            this._setColor( offset, color );
+            if( equals( node, automaton.last() ) )
+                this._animation.done =true;
+            else
+                this._animation.node = automaton.next( node );
+        } else if( this._animation.mode === 'rows' ) {
+            let row = this._animation.row;
+            for( let j =0; j < automaton.rowLength(row); j++ ) {
+                let node = { col: j, row: row };
+                let color = this._nodeColor( node );
+                let offset = this._calcNodeOffset( node );
+                this._setColor( offset, color );
+            }
+            if( row+1 === automaton.rows )
+                this._animation.done =true;
+            else
+                this._animation.row++;
+        }
 
-        this._setColor( offset, new THREE.Color( color ) );
-        if( equals( node, automaton.last() ) )
-            this._animation.done =true;
-        else
-            this._animation.node = automaton.next( node );
         // Update the buffer
         this._model.attr_color.needsUpdate =true;
     }
 
+    /*
+     * Create a new geometry (mesh) based on the size of the automaton 
+     * and the viewmode. Discards all previous geometry.
+     */
     _updateGeometry( populate = true ) { 
         const automaton =this.automaton;
         if( automaton === null )
@@ -419,19 +453,14 @@ export default class Viewport {
             for( let j =0; j < automaton.rowLength(i); j++ ) {
                 position.x = -automaton.width / 2 + 0.5 * i + j; 
                 
-                let color =this.backgroundColor;
-                if( populate ) {
-                    let value = automaton.value( { row: i, col: j });
-                    if( value >= 0 ) 
-                        color = this.palette[ value ];
-                }
+                let color =populate ? this._nodeColor( {row: i, col: i} ) : new THREE.Color( this.backgroundColor );
+                
                 if( viewmode !== 'folded' ) {
-                    addInstance( new THREE.Color( color ), position );
+                    addInstance( color, position );
                 }
                 else {
-                   
                     let p = foldedPosition( i, j, automaton.rowLength(i), automaton.opts.input.length, right, automaton.opts.mode );
-                    addInstance( new THREE.Color( color ), p );
+                    addInstance( color, p );
                 }
 
             }

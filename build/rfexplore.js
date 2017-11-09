@@ -712,7 +712,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this.viewportWidth = this.container.offsetWidth;
 	        this.viewportHeight = this.container.offsetHeight;
 	
-	        this._viewmode = 'folded'; // one of brick, diamond, circle, folded
+	        this._viewmode = 'folded'; // one of 'brick', 'diamond', 'circle', 'folded'
 	        this._scene = null;
 	        this._aspect = 1.0;
 	        this._cameraPersp = null;
@@ -734,12 +734,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	            node_count: 0,
 	            mesh: null,
 	            viewmode: null,
-	            mode: 0
+	            mode: 0,
+	            input_nodes: null
 	        };
 	        this._animation = {
 	            animateGeometry: true,
+	            mode: 'rows', //  one of 'rows', 'ordered'
 	            done: false,
-	            node: { col: 0, row: 0 }
+	            node: { col: 0, row: 0 },
+	            row: 0
 	        };
 	    }
 	
@@ -759,7 +762,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	            _this.animate();
 	        });
 	        this._controls.update();
-	        this._populateNextNode();
+	        this._updateCellsAnimated();
 	        this.render();
 	    };
 	
@@ -867,19 +870,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	            console.log('Viewport: rebuilding geometry');
 	            var populate = !this._animation.animateGeometry;
 	            this._updateGeometry(populate);
-	            if (!populate) {
-	                this._animation.node = automaton.first();
-	                this._animation.done = false;
-	                this.animate();
-	            }
 	        } else {
-	            if (this._animation.animateGeometry) {
-	
-	                this._updateCells(true);
-	                this._animation.node = automaton.first();
-	                this._animation.done = false;
-	                this.animate();
-	            } else this._updateCells();
+	            if (!this._animation.animateGeometry) this._updateCells();
+	        }
+	        if (this._animation.animateGeometry) {
+	            this._updateCells(true);
+	            this._animation.node = automaton.first();this._animation.row = 0;
+	            this._animation.done = false;
+	            this.animate();
 	        }
 	        this.render();
 	    };
@@ -887,6 +885,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	    //
 	    // Private functions
 	    //
+	
+	
+	    /*
+	     * Set the geometry's color at position of node to color
+	     */
+	
 	
 	    Viewport.prototype._setColor = function _setColor(node, color) {
 	        var M = this._model;
@@ -911,6 +915,24 @@ return /******/ (function(modules) { // webpackBootstrap
 	        }
 	    };
 	
+	    /* 
+	     * Given a col and row, return the color that represents the value
+	     * of this node in the automaton
+	     */
+	
+	
+	    Viewport.prototype._nodeColor = function _nodeColor(node) {
+	        var color = this.backgroundColor;
+	        var value = this.automaton.value(node);
+	        if (value >= 0) color = this.palette[value];
+	        return new THREE.Color(color);
+	    };
+	
+	    /*
+	     * Given a col and row, calculate the offset within the geometry
+	     */
+	
+	
 	    Viewport.prototype._calcNodeOffset = function _calcNodeOffset(_ref) {
 	        var col = _ref.col,
 	            row = _ref.row;
@@ -923,6 +945,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	        }return rowoffs + col;
 	    };
 	
+	    /*
+	     * Change the colors of the geometry such that it represents the current automaton 
+	     */
+	
+	
 	    Viewport.prototype._updateCells = function _updateCells() {
 	        var only_clean = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
 	
@@ -933,10 +960,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        if (!only_clean) {
 	            for (var i = 0; i < automaton.rows; i++) {
 	                for (var j = 0; j < automaton.rowLength(i); j++) {
-	                    var color = this.backgroundColor;
-	                    var value = automaton.value({ row: i, col: j });
-	                    if (value >= 0) color = this.palette[value];
-	
+	                    var color = this._nodeColor({ row: i, col: j });
 	                    this._setColor(this._calcNodeOffset({ col: j, row: i }), new THREE.Color(color));
 	
 	                    node++;
@@ -951,22 +975,43 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this._model.attr_color.needsUpdate = true;
 	    };
 	
-	    Viewport.prototype._populateNextNode = function _populateNextNode() {
+	    /*
+	     * Change the colors of the geometry such that it represents the current automaton,
+	     * when animated, this function performs the next step in the animation.
+	     */
+	
+	
+	    Viewport.prototype._updateCellsAnimated = function _updateCellsAnimated() {
 	        var automaton = this.automaton;
 	        if (automaton === null) return;
 	
-	        var node = this._animation.node;
-	        var color = this.backgroundColor;
-	        var value = automaton.value(node);
-	        if (value >= 0) color = this.palette[value];
+	        if (this._animation.mode === 'ordered') {
+	            var node = this._animation.node;
+	            var color = this._nodeColor(node);
+	            var offset = this._calcNodeOffset(node);
 	
-	        var offset = this._calcNodeOffset(node);
+	            this._setColor(offset, color);
+	            if ((0, _value_equals2.default)(node, automaton.last())) this._animation.done = true;else this._animation.node = automaton.next(node);
+	        } else if (this._animation.mode === 'rows') {
+	            var row = this._animation.row;
+	            for (var j = 0; j < automaton.rowLength(row); j++) {
+	                var _node = { col: j, row: row };
+	                var _color = this._nodeColor(_node);
+	                var _offset = this._calcNodeOffset(_node);
+	                this._setColor(_offset, _color);
+	            }
+	            if (row + 1 === automaton.rows) this._animation.done = true;else this._animation.row++;
+	        }
 	
-	        this._setColor(offset, new THREE.Color(color));
-	        if ((0, _value_equals2.default)(node, automaton.last())) this._animation.done = true;else this._animation.node = automaton.next(node);
 	        // Update the buffer
 	        this._model.attr_color.needsUpdate = true;
 	    };
+	
+	    /*
+	     * Create a new geometry (mesh) based on the size of the automaton 
+	     * and the viewmode. Discards all previous geometry.
+	     */
+	
 	
 	    Viewport.prototype._updateGeometry = function _updateGeometry() {
 	        var populate = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : true;
@@ -1078,17 +1123,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	            for (var j = 0; j < automaton.rowLength(i); j++) {
 	                position.x = -automaton.width / 2 + 0.5 * i + j;
 	
-	                var color = this.backgroundColor;
-	                if (populate) {
-	                    var value = automaton.value({ row: i, col: j });
-	                    if (value >= 0) color = this.palette[value];
-	                }
-	                if (viewmode !== 'folded') {
-	                    addInstance(new THREE.Color(color), position);
-	                } else {
+	                var color = populate ? this._nodeColor({ row: i, col: i }) : new THREE.Color(this.backgroundColor);
 	
+	                if (viewmode !== 'folded') {
+	                    addInstance(color, position);
+	                } else {
 	                    var p = foldedPosition(i, j, automaton.rowLength(i), automaton.opts.input.length, right, automaton.opts.mode);
-	                    addInstance(new THREE.Color(color), p);
+	                    addInstance(color, p);
 	                }
 	            }
 	            position.y -= heightstep;
