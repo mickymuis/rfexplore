@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/html">
+
+<head>
+    <meta charset="utf8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>RFExplore</title>
+
+    <!-- dat.gui -->
+    <script type="text/javascript" src="lib/dat.gui/dat.gui.js"></script>
+
+    <link rel="stylesheet" href="src/rfexplore/dat.gui-theme.css">
+    <link rel="stylesheet" href="src/rfexplore/style.css">
+    <link rel="stylesheet" href="lib/font-awesome/css/font-awesome.min.css">
+
+</head>
+
+<body style="overflow: hidden !important;">
+    <div id="main" class="main-container">
+    </div>
+</body>
+
+<!-- THREE JS -->
+<script type="text/javascript" src="lib/threejs/three.js"></script>
+<script type="text/javascript" src="lib/threejs/OrbitControls.js"></script>
+
+
+<!-- rfexplore -->
+<script type="text/javascript" src="build/rfexplore.js"></script>
+
+<script>
+    var app = new rfexplore.App( { container_id: 'main' } );
+</script>
+
+
+</html>

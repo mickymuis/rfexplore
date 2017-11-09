@@ -1,0 +1,123 @@
+html, body, #main {
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    height: 100%;
+}
+* {
+    box-sizing: inherit;
+    transition-property: all;
+    transition-duration: .6s;
+    transition-timing-function: ease;
+margin: 0; padding: 0;
+}
+
+/* Slightly offset the dat.gui toolbox panel */
+.dg.ac {
+    padding-top: 47px;
+}
+
+.viewport {
+    padding-top: 32px;
+    width: 100%;
+    height: 100%;
+}
+
+/* Styles for the menubar module */
+.menubar {
+    background-color: #e8e8e8;
+    position: absolute;
+    top: 0;
+    right: 0;
+    min-height: 32px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    color: #555;
+    font: 11px 'Lucida Grande', sans-serif;
+    box-sizing: border-box;
+    z-index: 99;
+}
+
+.menubar .panel {
+    margin: 0 32px 0 32px;
+    padding: 0;
+    display: block;
+    position: relative;
+    height: 32px;
+}
+
+.menubar ul {
+    margin: 0;
+    padding: 0;
+    height: 32px;
+    position: absolute;
+
+}
+
+.menubar ul.float-left {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.menubar ul.float-right {
+    position: absolute;
+    top: 0;
+    right: 0;
+}
+
+.menubar ul.float-center {
+    position: absolute;
+    top: 0; bottom: 0;
+    left: 0; right: 0;
+    text-align: center;
+    margin: auto;
+    overflow: auto;
+}
+
+.menubar li {
+    list-style: none;
+    display: inline-block;
+    margin: 0 8px 0 8px;
+    padding: 0;
+    height: 32px;
+    vertical-align: middle;
+    line-height: 32px;
+}
+
+.menubar i {
+    vertical-align: middle;
+    font-size: 14px;
+}
+
+.menubar a.button {
+    background-color: #ccc;
+    border: 1px solid #ccc;
+    color: #555;
+    text-align: center;
+    text-decoration: none;
+    margin: 0;
+    padding: 0 4px 0 4px;
+    height: 32px;
+    min-width: 32px;
+    cursor: pointer;
+    display: block;
+    vertical-align: middle;
+}
+
+.menubar a.button:hover {
+    background-color: #ddd;
+    border: 1px solid #555;
+    color: #555;
+    cursor: pointer;
+}
+
+.menubar i.text-left {
+    margin: 0 0 0 4px;
+}
+
+.menubar i.text-right {
+    margin: 0 4px 0 0;
+}
+
