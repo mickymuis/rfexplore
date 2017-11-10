@@ -19,6 +19,8 @@ class UIController {
             rule: 6,
             input: [ 0, 1, 1, 0, 0, 1, 0 ]
         }; 
+
+        viewport.setOnInputClicked( (i)=>{this.incrementInput(i);} );
     }
     update() {
         if( this.autoUpdate )
@@ -62,6 +64,34 @@ class UIController {
         this.viewport.update();
     }
 
+    incrementInput( col ) {
+        let automaton = this._automaton;
+        if( col >= automaton.width )
+            return;
+        // If the automaton is left-folding, the input is on the right hand side
+        let i = this._opts.foldToRight ? col : col - (automaton.width - automaton.inputSize)
+        let input = this._opts.input;
+
+        // We may need to expand the input array using values from the automaton
+        let delta =0;
+        if( i >= input.length ) {
+            for( let j = input.length; j <= i; j++ ) {
+                input[j] = automaton.value( { col: j, row: 0 } );
+                delta++;
+            }
+        } else if( i < 0 ) {
+            for( let j = automaton.width - automaton.inputSize - 1; j >= col; j-- ) {
+                input.unshift( automaton.value( { col: j, row: 0 } ) );
+                delta++;
+            }
+            i =0;
+        }
+        this._opts.folds -= delta;
+        input[i] = (input[i] === (this._opts.base - 1)) ? 0 : input[i]+1;
+//        console.log( 'picked input ' + i + " new array" + input );
+        this.render();
+    }
+
     // Properties
     get color0()        { return this._palette[0]; }
     set color0(c)       { this._palette[0] =c; this.update(); }
@@ -82,6 +112,8 @@ class UIController {
     set folded(b)       { this._folded =b; this.update(); }
     get folds()         { return this._opts.folds; }
     set folds(i)        { this._opts.folds =i; this.update(); }
+    get rule()          { return this._opts.rule; }
+    set rule(i)         { if( i >= 0 && i < this._automaton.maxRules ) { this._opts.rule =i; this.update(); } }
 }
 
 class App {
@@ -127,15 +159,23 @@ class App {
         let a_ctrls = this.menubar.addGroup().floatLeft(); 
         a_ctrls.addLink( 'RFExplore' );
 
-        let step_ctrls = this.menubar.addGroup().floatCenter(); 
-        step_ctrls.addButton( '', 'fa fa-step-backward' );
-        step_ctrls.addButton( '', 'fa fa-step-forward' ).action( ()=>{ this.controller.step(); } );
-        step_ctrls.addLink( 'Hello' );
-        step_ctrls.addButton( '', 'fa fa-backward' );
-        step_ctrls.addButton( '', 'fa fa-forward' );
+        let step_ctrls = this.menubar.addGroup().floatCenter();
+        let rule_label =null;
+        step_ctrls.addButton( '', 'fa fa-backward' ).action( 
+                ()=> {
+                    this.controller.rule = this.controller.rule - 1;
+                    rule_label.text = 'Rule #' + this.controller.rule;
+                } );
+        rule_label = step_ctrls.addLink( 'Rule #' + this.controller.rule );
+        step_ctrls.addButton( '', 'fa fa-forward' ).action( 
+                ()=> {
+                    this.controller.rule = this.controller.rule + 1;
+                    rule_label.text = 'Rule #' + this.controller.rule;
+                } );
 
         let r_ctrls = this.menubar.addGroup().floatRight();
         r_ctrls.addButton( '', 'fa fa-arrows-alt' );
+        r_ctrls.addButton( '', 'fa fa-step-forward' ).action( ()=>{ this.controller.step(); } );
         r_ctrls.addButton( 'Render', 'fa fa-camera-retro' );
         r_ctrls.addLink( '', 'fa fa-circle-o' );
 

@@ -27,6 +27,8 @@ export default class Viewport {
         this._sceneHeight = 10;
         this._renderer = null;
         this._lights = new Array();
+        this._raycaster = new THREE.Raycaster();
+        this._mouse = new THREE.Vector2();
         this._model = { 
             geometry: null,
             attr_normal: null,
@@ -41,7 +43,8 @@ export default class Viewport {
             mesh: null,
             viewmode: null,
             mode: 0,
-            input_nodes: null
+            input_pickers: null,
+            picked: null
         };
         this._animation = {
             animateGeometry: true,
@@ -50,7 +53,9 @@ export default class Viewport {
             node: { col:0, row: 0 },
             row: 0
         };
+        this._inputClickCallback = null;
     }
+
     render() {
         if( this._viewmode === 'folded' ) {
             this._renderer.render( this._scene, this._cameraPersp );
@@ -84,7 +89,6 @@ export default class Viewport {
         this._renderer = new THREE.WebGLRenderer( {antialias:true} );
         this._renderer.setSize( this.viewportWidth, this.viewportHeight );
         this.container.appendChild( this._renderer.domElement );
-        window.addEventListener( 'resize', () => { this.resized(); } );
 
         /*let geometry = new THREE.BoxGeometry( 1, 1, 1 );
         let material = new THREE.MeshNormalMaterial();
@@ -125,6 +129,9 @@ export default class Viewport {
    //     this._scene.add( new THREE.DirectionalLightHelper( lights[2], 0.2 ));
         this.render();
 
+        window.addEventListener( 'resize', () => { this._onWindowResize(); } );
+        document.addEventListener( 'mousemove', (e) => { this._onDocumentMousemove(e); } );
+        this.container.addEventListener( 'click', () => { this._onClick(); } );
 
     }
 
@@ -139,17 +146,6 @@ export default class Viewport {
         this._cameraOrtho.bottom = sceneHeight / -2;
         this._cameraOrtho.updateProjectionMatrix();
 
-    }
-
-    resized() {
-        let container = this.container;
-
-        this.viewportWidth = container.offsetWidth;
-        this.viewportHeight = container.offsetHeight;
-        this._aspect = this.viewportWidth / this.viewportHeight;
-        this.updateCamera();
-        this._renderer.setSize( this.viewportWidth, this.viewportHeight );
-        this.render();
     }
 
     set viewmode( m ) {
@@ -168,6 +164,10 @@ export default class Viewport {
         this._viewmode =m;
         //this.updateGeometry();
 
+    }
+
+    setOnInputClicked( func ) {
+        this._inputClickCallback = func;
     }
 
     clearGeometry() {
@@ -208,6 +208,55 @@ export default class Viewport {
             this.animate();
         }
         this.render();
+    }
+    
+    //
+    // Private event listeners
+    //
+    
+    _onWindowResize() {
+        let container = this.container;
+
+        this.viewportWidth = container.offsetWidth;
+        this.viewportHeight = container.offsetHeight;
+        this._aspect = this.viewportWidth / this.viewportHeight;
+        this.updateCamera();
+        this._renderer.setSize( this.viewportWidth, this.viewportHeight );
+        this.render();
+    }
+
+    _onDocumentMousemove( event ) {
+        this._mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+        this._mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+        if( this.viewmode !== 'folded' ) {
+            let render =false;
+
+            this._raycaster.setFromCamera( this._mouse, this._cameraOrtho );
+            let intersects = this._raycaster.intersectObjects( this._model.input_pickers );
+
+            if( this._model.picked !== null ) {
+                this._model.picked.material.opacity = 0.0;
+                this._model.picked = null;
+                render =true;
+            }
+            if( intersects.length !== 0 ) {
+                intersects[0].object.material.opacity = 0.5;
+                this._model.picked = intersects[0].object;
+                render =true;
+            }
+            if( render )
+                this.render();
+        }
+    }
+
+    _onClick() {
+        let picked = this._model.picked;
+        if( picked !== null ) {
+            if( typeof this._inputClickCallback === 'function' ) {
+                this._inputClickCallback( picked.userData.col );
+            }
+        }
     }
 
     //
@@ -351,7 +400,12 @@ export default class Viewport {
             M.attr_normal.setArray(null);
             M.attr_color.setArray(null);*/
             M.geometry.dispose();
+            for( let i =0; i < M.input_pickers.length; i++ ) {
+                this._scene.remove( M.input_pickers[i] );
+            }
+            
         }
+        M.input_pickers = new Array();
         
         // For some viewmode we use a template geometry
         // Here we prepare this geometry and the material
@@ -456,7 +510,21 @@ export default class Viewport {
                 let color =populate ? this._nodeColor( {row: i, col: i} ) : new THREE.Color( this.backgroundColor );
                 
                 if( viewmode !== 'folded' ) {
+                    // Add an instance to the main geometry
                     addInstance( color, position );
+
+                    // If the node is an input node, also add a picking-mesh for user input
+                    if( i === 0 ) {
+                        let g = template.clone();
+                        g.translate( position.x, position.y, 1 );
+                        let picker_material = 
+                            new THREE.MeshBasicMaterial( {side: THREE.DoubleSide, color: '#ffffff', transparent: true, opacity: 0.0 } );
+                        let picker_mesh = new THREE.Mesh( g, picker_material );
+                        
+                        picker_mesh.userData.col = j;
+                        this._scene.add( picker_mesh );                       
+                        M.input_pickers.push( picker_mesh );
+                    }
                 }
                 else {
                     let p = foldedPosition( i, j, automaton.rowLength(i), automaton.opts.input.length, right, automaton.opts.mode );

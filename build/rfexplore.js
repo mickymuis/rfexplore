@@ -85,11 +85,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	var _viewport2 = _interopRequireDefault(_viewport);
 	
-	var _menubar = __webpack_require__(4);
+	var _menubar = __webpack_require__(5);
 	
 	var _menubar2 = _interopRequireDefault(_menubar);
 	
-	var _value_equals = __webpack_require__(5);
+	var _value_equals = __webpack_require__(4);
 	
 	var _value_equals2 = _interopRequireDefault(_value_equals);
 	
@@ -99,6 +99,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	var UIController = function () {
 	    function UIController(viewport) {
+	        var _this = this;
+	
 	        _classCallCheck(this, UIController);
 	
 	        this.viewport = viewport;
@@ -115,6 +117,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	            rule: 6,
 	            input: [0, 1, 1, 0, 0, 1, 0]
 	        };
+	
+	        viewport.setOnInputClicked(function (i) {
+	            _this.incrementInput(i);
+	        });
 	    }
 	
 	    UIController.prototype.update = function update() {
@@ -154,6 +160,33 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	        this._automaton.step();
 	        this.viewport.update();
+	    };
+	
+	    UIController.prototype.incrementInput = function incrementInput(col) {
+	        var automaton = this._automaton;
+	        if (col >= automaton.width) return;
+	        // If the automaton is left-folding, the input is on the right hand side
+	        var i = this._opts.foldToRight ? col : col - (automaton.width - automaton.inputSize);
+	        var input = this._opts.input;
+	
+	        // We may need to expand the input array using values from the automaton
+	        var delta = 0;
+	        if (i >= input.length) {
+	            for (var j = input.length; j <= i; j++) {
+	                input[j] = automaton.value({ col: j, row: 0 });
+	                delta++;
+	            }
+	        } else if (i < 0) {
+	            for (var _j = automaton.width - automaton.inputSize - 1; _j >= col; _j--) {
+	                input.unshift(automaton.value({ col: _j, row: 0 }));
+	                delta++;
+	            }
+	            i = 0;
+	        }
+	        this._opts.folds -= delta;
+	        input[i] = input[i] === this._opts.base - 1 ? 0 : input[i] + 1;
+	        //        console.log( 'picked input ' + i + " new array" + input );
+	        this.render();
 	    };
 	
 	    // Properties
@@ -231,6 +264,16 @@ return /******/ (function(modules) { // webpackBootstrap
 	        set: function set(i) {
 	            this._opts.folds = i;this.update();
 	        }
+	    }, {
+	        key: "rule",
+	        get: function get() {
+	            return this._opts.rule;
+	        },
+	        set: function set(i) {
+	            if (i >= 0 && i < this._automaton.maxRules) {
+	                this._opts.rule = i;this.update();
+	            }
+	        }
 	    }]);
 	
 	    return UIController;
@@ -278,7 +321,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	
 	    App.prototype.setupMenubar = function setupMenubar() {
-	        var _this = this;
+	        var _this2 = this;
 	
 	        // Make a menubar 
 	        this.menubar = new _menubar2.default(this.container);
@@ -287,22 +330,28 @@ return /******/ (function(modules) { // webpackBootstrap
 	        a_ctrls.addLink('RFExplore');
 	
 	        var step_ctrls = this.menubar.addGroup().floatCenter();
-	        step_ctrls.addButton('', 'fa fa-step-backward');
-	        step_ctrls.addButton('', 'fa fa-step-forward').action(function () {
-	            _this.controller.step();
+	        var rule_label = null;
+	        step_ctrls.addButton('', 'fa fa-backward').action(function () {
+	            _this2.controller.rule = _this2.controller.rule - 1;
+	            rule_label.text = 'Rule #' + _this2.controller.rule;
 	        });
-	        step_ctrls.addLink('Hello');
-	        step_ctrls.addButton('', 'fa fa-backward');
-	        step_ctrls.addButton('', 'fa fa-forward');
+	        rule_label = step_ctrls.addLink('Rule #' + this.controller.rule);
+	        step_ctrls.addButton('', 'fa fa-forward').action(function () {
+	            _this2.controller.rule = _this2.controller.rule + 1;
+	            rule_label.text = 'Rule #' + _this2.controller.rule;
+	        });
 	
 	        var r_ctrls = this.menubar.addGroup().floatRight();
 	        r_ctrls.addButton('', 'fa fa-arrows-alt');
+	        r_ctrls.addButton('', 'fa fa-step-forward').action(function () {
+	            _this2.controller.step();
+	        });
 	        r_ctrls.addButton('Render', 'fa fa-camera-retro');
 	        r_ctrls.addLink('', 'fa fa-circle-o');
 	    };
 	
 	    App.prototype.setupToolbox = function setupToolbox() {
-	        var _this2 = this;
+	        var _this3 = this;
 	
 	        this.toolbox = new dat.GUI();
 	
@@ -322,7 +371,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        // Colors toolbox
 	        var f_c = this.toolbox.addFolder('Colors');
 	        f_c.addColor(this.controller, 'color0').name('0').onFinishChange(function () {
-	            _this2.controller.update();
+	            _this3.controller.update();
 	        });
 	        f_c.addColor(this.controller, 'color1').name('1');
 	        f_c.addColor(this.controller, 'color2').name('2');
@@ -400,6 +449,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this._curPos = this._rows[0].length - 1;
 	        this._folds = 0;
 	
+	        this.maxRules = 0;
 	        this.ttable = this.makeTTable(base, mode, rule);
 	        this.nodeCount = this.width;
 	        this.inputSize = input.length;
@@ -423,10 +473,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    Automaton.prototype.makeTTable = function makeTTable(base, mode, rule) {
 	        var tt = new Array();
 	        var rulesize = Math.pow(base, mode);
-	        var maxrules = Math.pow(base, rulesize);
+	        this.maxRules = Math.pow(base, rulesize);
 	
-	        console.log("Transition table for rule #" + rule + " / " + maxrules + " * " + rulesize);
-	        if (rulesize > maxrules) {
+	        console.log("Transition table for rule #" + rule + " / " + this.maxRules + " * " + rulesize);
+	        if (rulesize > this.maxRules) {
 	            return null;
 	        }
 	
@@ -538,7 +588,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this._curPos = nextPos.col;
 	
 	        if (this._curRow === 0) {
-	            console.log("fold");
+	            //console.log( "fold" );
 	            // Top row, which means the next step can only be a fold
 	            // Step 1. extend all rows by one
 	            for (var i = 0; i < this._rows.length; i++) {
@@ -571,9 +621,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	    Automaton.prototype.generate = function generate(done) {
 	
-	        while (this._folds < this.opts.folds) {
+	        while (this._rows[this._curRow].length !== 1 || this._folds !== this.opts.folds) {
 	            this.step();
-	        }if (typeof done === 'function') done(this);
+	        }
+	
+	        if (typeof done === 'function') done(this);
 	    };
 	
 	    /*
@@ -687,7 +739,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 	
-	var _value_equals = __webpack_require__(5);
+	var _value_equals = __webpack_require__(4);
 	
 	var _value_equals2 = _interopRequireDefault(_value_equals);
 	
@@ -721,6 +773,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this._sceneHeight = 10;
 	        this._renderer = null;
 	        this._lights = new Array();
+	        this._raycaster = new THREE.Raycaster();
+	        this._mouse = new THREE.Vector2();
 	        this._model = {
 	            geometry: null,
 	            attr_normal: null,
@@ -735,7 +789,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	            mesh: null,
 	            viewmode: null,
 	            mode: 0,
-	            input_nodes: null
+	            input_pickers: null,
+	            picked: null
 	        };
 	        this._animation = {
 	            animateGeometry: true,
@@ -744,6 +799,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	            node: { col: 0, row: 0 },
 	            row: 0
 	        };
+	        this._inputClickCallback = null;
 	    }
 	
 	    Viewport.prototype.render = function render() {
@@ -780,9 +836,6 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this._renderer = new THREE.WebGLRenderer({ antialias: true });
 	        this._renderer.setSize(this.viewportWidth, this.viewportHeight);
 	        this.container.appendChild(this._renderer.domElement);
-	        window.addEventListener('resize', function () {
-	            _this2.resized();
-	        });
 	
 	        /*let geometry = new THREE.BoxGeometry( 1, 1, 1 );
 	        let material = new THREE.MeshNormalMaterial();
@@ -824,6 +877,16 @@ return /******/ (function(modules) { // webpackBootstrap
 	        //     this._scene.add( new THREE.DirectionalLightHelper( lights[1], 0.2 ));
 	        //     this._scene.add( new THREE.DirectionalLightHelper( lights[2], 0.2 ));
 	        this.render();
+	
+	        window.addEventListener('resize', function () {
+	            _this2._onWindowResize();
+	        });
+	        document.addEventListener('mousemove', function (e) {
+	            _this2._onDocumentMousemove(e);
+	        });
+	        this.container.addEventListener('click', function () {
+	            _this2._onClick();
+	        });
 	    };
 	
 	    Viewport.prototype.updateCamera = function updateCamera() {
@@ -838,15 +901,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this._cameraOrtho.updateProjectionMatrix();
 	    };
 	
-	    Viewport.prototype.resized = function resized() {
-	        var container = this.container;
-	
-	        this.viewportWidth = container.offsetWidth;
-	        this.viewportHeight = container.offsetHeight;
-	        this._aspect = this.viewportWidth / this.viewportHeight;
-	        this.updateCamera();
-	        this._renderer.setSize(this.viewportWidth, this.viewportHeight);
-	        this.render();
+	    Viewport.prototype.setOnInputClicked = function setOnInputClicked(func) {
+	        this._inputClickCallback = func;
 	    };
 	
 	    Viewport.prototype.clearGeometry = function clearGeometry() {
@@ -880,6 +936,54 @@ return /******/ (function(modules) { // webpackBootstrap
 	            this.animate();
 	        }
 	        this.render();
+	    };
+	
+	    //
+	    // Private event listeners
+	    //
+	
+	    Viewport.prototype._onWindowResize = function _onWindowResize() {
+	        var container = this.container;
+	
+	        this.viewportWidth = container.offsetWidth;
+	        this.viewportHeight = container.offsetHeight;
+	        this._aspect = this.viewportWidth / this.viewportHeight;
+	        this.updateCamera();
+	        this._renderer.setSize(this.viewportWidth, this.viewportHeight);
+	        this.render();
+	    };
+	
+	    Viewport.prototype._onDocumentMousemove = function _onDocumentMousemove(event) {
+	        this._mouse.x = event.clientX / window.innerWidth * 2 - 1;
+	        this._mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+	
+	        if (this.viewmode !== 'folded') {
+	            var render = false;
+	
+	            this._raycaster.setFromCamera(this._mouse, this._cameraOrtho);
+	            var intersects = this._raycaster.intersectObjects(this._model.input_pickers);
+	
+	            if (this._model.picked !== null) {
+	                this._model.picked.material.opacity = 0.0;
+	                this._model.picked = null;
+	                render = true;
+	            }
+	            if (intersects.length !== 0) {
+	                intersects[0].object.material.opacity = 0.5;
+	                this._model.picked = intersects[0].object;
+	                render = true;
+	            }
+	            if (render) this.render();
+	        }
+	    };
+	
+	    Viewport.prototype._onClick = function _onClick() {
+	        var picked = this._model.picked;
+	        if (picked !== null) {
+	            if (typeof this._inputClickCallback === 'function') {
+	                this._inputClickCallback(picked.userData.col);
+	            }
+	        }
 	    };
 	
 	    //
@@ -1031,7 +1135,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	             M.attr_normal.setArray(null);
 	             M.attr_color.setArray(null);*/
 	            M.geometry.dispose();
+	            for (var i = 0; i < M.input_pickers.length; i++) {
+	                this._scene.remove(M.input_pickers[i]);
+	            }
 	        }
+	        M.input_pickers = new Array();
 	
 	        // For some viewmode we use a template geometry
 	        // Here we prepare this geometry and the material
@@ -1074,18 +1182,18 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var addInstance = function addInstance(color, translate) {
 	            var positions = template.getAttribute('position').array;
 	            var normals = template.getAttribute('normal').array;
-	            for (var i = 0; i < M.template_size; i += 3) {
-	                M.buf_position[M.offset + i] = positions[i] + translate.x;
-	                M.buf_position[M.offset + i + 1] = positions[i + 1] + translate.y;
-	                M.buf_position[M.offset + i + 2] = positions[i + 2] + translate.z;
+	            for (var _i = 0; _i < M.template_size; _i += 3) {
+	                M.buf_position[M.offset + _i] = positions[_i] + translate.x;
+	                M.buf_position[M.offset + _i + 1] = positions[_i + 1] + translate.y;
+	                M.buf_position[M.offset + _i + 2] = positions[_i + 2] + translate.z;
 	
-	                M.buf_color[M.offset + i] = color.r * 255;
-	                M.buf_color[M.offset + i + 1] = color.g * 255;
-	                M.buf_color[M.offset + i + 2] = color.b * 255;
+	                M.buf_color[M.offset + _i] = color.r * 255;
+	                M.buf_color[M.offset + _i + 1] = color.g * 255;
+	                M.buf_color[M.offset + _i + 2] = color.b * 255;
 	
-	                M.buf_normal[M.offset + i] = normals[i] * 32767;
-	                M.buf_normal[M.offset + i + 1] = normals[i + 1] * 32767;
-	                M.buf_normal[M.offset + i + 2] = normals[i + 2] * 32767;
+	                M.buf_normal[M.offset + _i] = normals[_i] * 32767;
+	                M.buf_normal[M.offset + _i + 1] = normals[_i + 1] * 32767;
+	                M.buf_normal[M.offset + _i + 2] = normals[_i + 2] * 32767;
 	            }
 	            M.offset += positions.length;
 	        };
@@ -1119,16 +1227,29 @@ return /******/ (function(modules) { // webpackBootstrap
 	        }
 	
 	        var position = new THREE.Vector3(0, (automaton.rows - 1) * heightstep / 2, 0);
-	        for (var i = 0; i < automaton.rows; i++) {
-	            for (var j = 0; j < automaton.rowLength(i); j++) {
-	                position.x = -automaton.width / 2 + 0.5 * i + j;
+	        for (var _i2 = 0; _i2 < automaton.rows; _i2++) {
+	            for (var j = 0; j < automaton.rowLength(_i2); j++) {
+	                position.x = -automaton.width / 2 + 0.5 * _i2 + j;
 	
-	                var color = populate ? this._nodeColor({ row: i, col: i }) : new THREE.Color(this.backgroundColor);
+	                var color = populate ? this._nodeColor({ row: _i2, col: _i2 }) : new THREE.Color(this.backgroundColor);
 	
 	                if (viewmode !== 'folded') {
+	                    // Add an instance to the main geometry
 	                    addInstance(color, position);
+	
+	                    // If the node is an input node, also add a picking-mesh for user input
+	                    if (_i2 === 0) {
+	                        var g = template.clone();
+	                        g.translate(position.x, position.y, 1);
+	                        var picker_material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: '#ffffff', transparent: true, opacity: 0.0 });
+	                        var picker_mesh = new THREE.Mesh(g, picker_material);
+	
+	                        picker_mesh.userData.col = j;
+	                        this._scene.add(picker_mesh);
+	                        M.input_pickers.push(picker_mesh);
+	                    }
 	                } else {
-	                    var p = foldedPosition(i, j, automaton.rowLength(i), automaton.opts.input.length, right, automaton.opts.mode);
+	                    var p = foldedPosition(_i2, j, automaton.rowLength(_i2), automaton.opts.input.length, right, automaton.opts.mode);
 	                    addInstance(color, p);
 	                }
 	            }
@@ -1182,6 +1303,214 @@ return /******/ (function(modules) { // webpackBootstrap
 
 /***/ },
 /* 4 */
+/***/ function(module, exports) {
+
+	'use strict';
+	
+	exports.__esModule = true;
+	exports.default = equals;
+	/*  value_equals.js
+	    
+	    The MIT License (MIT)
+	    
+	    Copyright (c) 2013-2017, Reactive Sets
+	    
+	    Permission is hereby granted, free of charge, to any person obtaining a copy
+	    of this software and associated documentation files (the "Software"), to deal
+	    in the Software without restriction, including without limitation the rights
+	    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+	    copies of the Software, and to permit persons to whom the Software is
+	    furnished to do so, subject to the following conditions:
+	    
+	    The above copyright notice and this permission notice shall be included in all
+	    copies or substantial portions of the Software.
+	    
+	    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+	    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+	    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+	    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+	    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+	    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+	    SOFTWARE.
+	*/
+	/* Slightly modified version of https://github.com/ReactiveSets/toubkal/blob/master/lib/util/value_equals.js */
+	
+	/* -----------------------------------------------------------------------------------------
+	 equals( a, b [, enforce_properties_order, cyclic] )
+	 
+	 Returns true if a and b are deeply equal, false otherwise.
+	 
+	 Parameters:
+	   - a (Any type): value to compare to b
+	   - b (Any type): value compared to a
+	 
+	 Optional Parameters:
+	   - enforce_properties_order (Boolean): true to check if Object properties are provided
+	     in the same order between a and b
+	   
+	   - cyclic (Boolean): true to check for cycles in cyclic objects
+	 
+	 Implementation:
+	   'a' is considered equal to 'b' if all scalar values in a and b are strictly equal as
+	   compared with operator '===' except for these two special cases:
+	     - 0 === -0 but are not equal.
+	     - NaN is not === to itself but is equal.
+	   
+	   RegExp objects are considered equal if they have the same lastIndex, i.e. both regular
+	   expressions have matched the same number of times.
+	   
+	   Functions must be identical, so that they have the same closure context.
+	   
+	   "undefined" is a valid value, including in Objects
+	   
+	   106 automated tests.
+	   
+	   Provide options for slower, less-common use cases:
+	   
+	     - Unless enforce_properties_order is true, if 'a' and 'b' are non-Array Objects, the
+	       order of occurence of their attributes is considered irrelevant:
+	         { a: 1, b: 2 } is considered equal to { b: 2, a: 1 }
+	     
+	     - Unless cyclic is true, Cyclic objects will throw:
+	         RangeError: Maximum call stack size exceeded
+	*/
+	function equals(a, b, enforce_properties_order, cyclic) {
+	  return a === b // strick equality should be enough unless zero
+	  && a !== 0 // because 0 === -0, requires test by _equals()
+	  || _equals(a, b) // handles not strictly equal or zero values
+	  ;
+	
+	  function _equals(a, b) {
+	    // a and b have already failed test for strict equality or are zero
+	
+	    var s, l, p, x, y;
+	
+	    // They should have the same toString() signature
+	    if ((s = toString.call(a)) !== toString.call(b)) return false;
+	
+	    switch (s) {
+	      default:
+	        // Boolean, Date, String
+	        return a.valueOf() === b.valueOf();
+	
+	      case '[object Number]':
+	        // Converts Number instances into primitive values
+	        // This is required also for NaN test bellow
+	        a = +a;
+	        b = +b;
+	
+	        return a ? // a is Non-zero and Non-NaN
+	        a === b : // a is 0, -0 or NaN
+	        a === a ? // a is 0 or -O
+	        1 / a === 1 / b // 1/0 !== 1/-0 because Infinity !== -Infinity
+	        : b !== b // NaN, the only Number not equal to itself!
+	        ;
+	      // [object Number]
+	
+	      case '[object RegExp]':
+	        return a.source == b.source && a.global == b.global && a.ignoreCase == b.ignoreCase && a.multiline == b.multiline && a.lastIndex == b.lastIndex;
+	      // [object RegExp]
+	
+	      case '[object Function]':
+	        return false; // functions should be strictly equal because of closure context
+	      // [object Function]
+	
+	      case '[object Array]':
+	        if (cyclic && (x = reference_equals(a, b)) !== null) return x; // intentionally duplicated bellow for [object Object]
+	
+	        if ((l = a.length) != b.length) return false;
+	        // Both have as many elements
+	
+	        while (l--) {
+	          if ((x = a[l]) === (y = b[l]) && x !== 0 || _equals(x, y)) continue;
+	
+	          return false;
+	        }
+	
+	        return true;
+	      // [object Array]
+	
+	      case '[object Object]':
+	        if (cyclic && (x = reference_equals(a, b)) !== null) return x; // intentionally duplicated from above for [object Array]
+	
+	        l = 0; // counter of own properties
+	
+	        if (enforce_properties_order) {
+	          var properties = [];
+	
+	          for (p in a) {
+	            if (a.hasOwnProperty(p)) {
+	              properties.push(p);
+	
+	              if ((x = a[p]) === (y = b[p]) && x !== 0 || _equals(x, y)) continue;
+	
+	              return false;
+	            }
+	          }
+	
+	          // Check if 'b' has as the same properties as 'a' in the same order
+	          for (p in b) {
+	            if (b.hasOwnProperty(p) && properties[l++] != p) return false;
+	          }
+	        } else {
+	          for (p in a) {
+	            if (a.hasOwnProperty(p)) {
+	              ++l;
+	
+	              if ((x = a[p]) === (y = b[p]) && x !== 0 || _equals(x, y)) continue;
+	
+	              return false;
+	            }
+	          }
+	
+	          // Check if 'b' has as not more own properties than 'a'
+	          for (p in b) {
+	            if (b.hasOwnProperty(p) && --l < 0) return false;
+	          }
+	        }
+	
+	        return true;
+	      // [object Object]
+	    } // switch toString.call( a )
+	  } // _equals()
+	
+	  /* -----------------------------------------------------------------------------------------
+	     reference_equals( a, b )
+	     
+	     Helper function to compare object references on cyclic objects or arrays.
+	     
+	     Returns:
+	       - null if a or b is not part of a cycle, adding them to object_references array
+	       - true: same cycle found for a and b
+	       - false: different cycle found for a and b
+	     
+	     On the first call of a specific invocation of equal(), replaces self with inner function
+	     holding object_references array object in closure context.
+	     
+	     This allows to create a context only if and when an invocation of equal() compares
+	     objects or arrays.
+	  */
+	  function reference_equals(a, b) {
+	    var object_references = [];
+	
+	    return (reference_equals = _reference_equals)(a, b);
+	
+	    function _reference_equals(a, b) {
+	      var l = object_references.length;
+	
+	      while (l--) {
+	        if (object_references[l--] === b) return object_references[l] === a;
+	      }object_references.push(a, b);
+	
+	      return null;
+	    } // _reference_equals()
+	  } // reference_equals()
+	} // equals()
+	
+	module.exports = exports['default'];
+
+/***/ },
+/* 5 */
 /***/ function(module, exports) {
 
 	'use strict';
@@ -1396,214 +1725,6 @@ return /******/ (function(modules) { // webpackBootstrap
 	}();
 	
 	exports.default = Menubar;
-	module.exports = exports['default'];
-
-/***/ },
-/* 5 */
-/***/ function(module, exports) {
-
-	'use strict';
-	
-	exports.__esModule = true;
-	exports.default = equals;
-	/*  value_equals.js
-	    
-	    The MIT License (MIT)
-	    
-	    Copyright (c) 2013-2017, Reactive Sets
-	    
-	    Permission is hereby granted, free of charge, to any person obtaining a copy
-	    of this software and associated documentation files (the "Software"), to deal
-	    in the Software without restriction, including without limitation the rights
-	    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-	    copies of the Software, and to permit persons to whom the Software is
-	    furnished to do so, subject to the following conditions:
-	    
-	    The above copyright notice and this permission notice shall be included in all
-	    copies or substantial portions of the Software.
-	    
-	    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-	    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-	    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-	    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-	    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-	    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-	    SOFTWARE.
-	*/
-	/* Slightly modified version of https://github.com/ReactiveSets/toubkal/blob/master/lib/util/value_equals.js */
-	
-	/* -----------------------------------------------------------------------------------------
-	 equals( a, b [, enforce_properties_order, cyclic] )
-	 
-	 Returns true if a and b are deeply equal, false otherwise.
-	 
-	 Parameters:
-	   - a (Any type): value to compare to b
-	   - b (Any type): value compared to a
-	 
-	 Optional Parameters:
-	   - enforce_properties_order (Boolean): true to check if Object properties are provided
-	     in the same order between a and b
-	   
-	   - cyclic (Boolean): true to check for cycles in cyclic objects
-	 
-	 Implementation:
-	   'a' is considered equal to 'b' if all scalar values in a and b are strictly equal as
-	   compared with operator '===' except for these two special cases:
-	     - 0 === -0 but are not equal.
-	     - NaN is not === to itself but is equal.
-	   
-	   RegExp objects are considered equal if they have the same lastIndex, i.e. both regular
-	   expressions have matched the same number of times.
-	   
-	   Functions must be identical, so that they have the same closure context.
-	   
-	   "undefined" is a valid value, including in Objects
-	   
-	   106 automated tests.
-	   
-	   Provide options for slower, less-common use cases:
-	   
-	     - Unless enforce_properties_order is true, if 'a' and 'b' are non-Array Objects, the
-	       order of occurence of their attributes is considered irrelevant:
-	         { a: 1, b: 2 } is considered equal to { b: 2, a: 1 }
-	     
-	     - Unless cyclic is true, Cyclic objects will throw:
-	         RangeError: Maximum call stack size exceeded
-	*/
-	function equals(a, b, enforce_properties_order, cyclic) {
-	  return a === b // strick equality should be enough unless zero
-	  && a !== 0 // because 0 === -0, requires test by _equals()
-	  || _equals(a, b) // handles not strictly equal or zero values
-	  ;
-	
-	  function _equals(a, b) {
-	    // a and b have already failed test for strict equality or are zero
-	
-	    var s, l, p, x, y;
-	
-	    // They should have the same toString() signature
-	    if ((s = toString.call(a)) !== toString.call(b)) return false;
-	
-	    switch (s) {
-	      default:
-	        // Boolean, Date, String
-	        return a.valueOf() === b.valueOf();
-	
-	      case '[object Number]':
-	        // Converts Number instances into primitive values
-	        // This is required also for NaN test bellow
-	        a = +a;
-	        b = +b;
-	
-	        return a ? // a is Non-zero and Non-NaN
-	        a === b : // a is 0, -0 or NaN
-	        a === a ? // a is 0 or -O
-	        1 / a === 1 / b // 1/0 !== 1/-0 because Infinity !== -Infinity
-	        : b !== b // NaN, the only Number not equal to itself!
-	        ;
-	      // [object Number]
-	
-	      case '[object RegExp]':
-	        return a.source == b.source && a.global == b.global && a.ignoreCase == b.ignoreCase && a.multiline == b.multiline && a.lastIndex == b.lastIndex;
-	      // [object RegExp]
-	
-	      case '[object Function]':
-	        return false; // functions should be strictly equal because of closure context
-	      // [object Function]
-	
-	      case '[object Array]':
-	        if (cyclic && (x = reference_equals(a, b)) !== null) return x; // intentionally duplicated bellow for [object Object]
-	
-	        if ((l = a.length) != b.length) return false;
-	        // Both have as many elements
-	
-	        while (l--) {
-	          if ((x = a[l]) === (y = b[l]) && x !== 0 || _equals(x, y)) continue;
-	
-	          return false;
-	        }
-	
-	        return true;
-	      // [object Array]
-	
-	      case '[object Object]':
-	        if (cyclic && (x = reference_equals(a, b)) !== null) return x; // intentionally duplicated from above for [object Array]
-	
-	        l = 0; // counter of own properties
-	
-	        if (enforce_properties_order) {
-	          var properties = [];
-	
-	          for (p in a) {
-	            if (a.hasOwnProperty(p)) {
-	              properties.push(p);
-	
-	              if ((x = a[p]) === (y = b[p]) && x !== 0 || _equals(x, y)) continue;
-	
-	              return false;
-	            }
-	          }
-	
-	          // Check if 'b' has as the same properties as 'a' in the same order
-	          for (p in b) {
-	            if (b.hasOwnProperty(p) && properties[l++] != p) return false;
-	          }
-	        } else {
-	          for (p in a) {
-	            if (a.hasOwnProperty(p)) {
-	              ++l;
-	
-	              if ((x = a[p]) === (y = b[p]) && x !== 0 || _equals(x, y)) continue;
-	
-	              return false;
-	            }
-	          }
-	
-	          // Check if 'b' has as not more own properties than 'a'
-	          for (p in b) {
-	            if (b.hasOwnProperty(p) && --l < 0) return false;
-	          }
-	        }
-	
-	        return true;
-	      // [object Object]
-	    } // switch toString.call( a )
-	  } // _equals()
-	
-	  /* -----------------------------------------------------------------------------------------
-	     reference_equals( a, b )
-	     
-	     Helper function to compare object references on cyclic objects or arrays.
-	     
-	     Returns:
-	       - null if a or b is not part of a cycle, adding them to object_references array
-	       - true: same cycle found for a and b
-	       - false: different cycle found for a and b
-	     
-	     On the first call of a specific invocation of equal(), replaces self with inner function
-	     holding object_references array object in closure context.
-	     
-	     This allows to create a context only if and when an invocation of equal() compares
-	     objects or arrays.
-	  */
-	  function reference_equals(a, b) {
-	    var object_references = [];
-	
-	    return (reference_equals = _reference_equals)(a, b);
-	
-	    function _reference_equals(a, b) {
-	      var l = object_references.length;
-	
-	      while (l--) {
-	        if (object_references[l--] === b) return object_references[l] === a;
-	      }object_references.push(a, b);
-	
-	      return null;
-	    } // _reference_equals()
-	  } // reference_equals()
-	} // equals()
-	
 	module.exports = exports['default'];
 
 /***/ }

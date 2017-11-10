@@ -36,7 +36,8 @@ export default class Automaton {
         this._curRow = 0; // row 0 is the top (input) row
         this._curPos = this._rows[0].length -1;
         this._folds  = 0;
-        
+       
+        this.maxRules =0;
         this.ttable = this.makeTTable( base, mode, rule );
         this.nodeCount = this.width;
         this.inputSize = input.length;
@@ -64,10 +65,10 @@ export default class Automaton {
     makeTTable( base, mode, rule ) {
         var tt = new Array();
         let rulesize = Math.pow( base, mode );
-        let maxrules = Math.pow( base, rulesize );
+        this.maxRules = Math.pow( base, rulesize );
 
-        console.log( "Transition table for rule #" + rule + " / " + maxrules + " * " + rulesize );
-        if( rulesize > maxrules ) {
+        console.log( "Transition table for rule #" + rule + " / " + this.maxRules + " * " + rulesize );
+        if( rulesize > this.maxRules ) {
             return null;
         }
 
@@ -156,7 +157,7 @@ export default class Automaton {
         this._curPos = nextPos.col;
 
         if( this._curRow === 0 ) {
-            console.log( "fold" );
+            //console.log( "fold" );
             // Top row, which means the next step can only be a fold
             // Step 1. extend all rows by one
             for( let i =0; i < this._rows.length; i++ ) {
@@ -191,7 +192,11 @@ export default class Automaton {
 
     generate( done ) {
         
-        while( this._folds < this.opts.folds ) this.step();
+        while( this._rows[this._curRow].length !== 1
+               || this._folds !== this.opts.folds ) {
+            this.step();
+        }
+
 
         if( typeof done  === 'function' )
             done( this );
