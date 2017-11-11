@@ -48,7 +48,7 @@ export default class Viewport {
         };
         this._animation = {
             animateGeometry: true,
-            mode: 'rows', //  one of 'rows', 'ordered'
+            type: 'rows', //  one of 'rows', 'ordered'
             done: false,
             node: { col:0, row: 0 },
             row: 0
@@ -165,6 +165,12 @@ export default class Viewport {
         //this.updateGeometry();
 
     }
+
+    set animationType( t ) { this._animation.type = t;  }
+    get animationType() { return this._animation.type; }
+
+    set animated( b ) { this._animation.animateGeometry =b; }
+    get animated() { return this._animation.animateGeometry; }
 
     setOnInputClicked( func ) {
         this._inputClickCallback = func;
@@ -351,7 +357,7 @@ export default class Viewport {
         if( automaton === null )
             return;
 
-        if( this._animation.mode === 'ordered' ) {
+        if( this._animation.type === 'ordered' ) {
             let node = this._animation.node;
             let color = this._nodeColor( node );
             let offset = this._calcNodeOffset( node );
@@ -361,7 +367,7 @@ export default class Viewport {
                 this._animation.done =true;
             else
                 this._animation.node = automaton.next( node );
-        } else if( this._animation.mode === 'rows' ) {
+        } else if( this._animation.type === 'rows' ) {
             let row = this._animation.row;
             for( let j =0; j < automaton.rowLength(row); j++ ) {
                 let node = { col: j, row: row };

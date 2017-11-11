@@ -58,6 +58,11 @@ export default class Automaton {
         return this._rows[i].length;
     }
 
+    static maxRules( base, mode ) {
+        let rulesize = Math.pow( base, mode );
+        return  Math.pow( base, rulesize );
+    }
+
     /*
      * Generate a transition table given a base, mode and rule number
      * Returns an array

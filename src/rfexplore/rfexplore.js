@@ -19,9 +19,22 @@ class UIController {
             rule: 6,
             input: [ 0, 1, 1, 0, 0, 1, 0 ]
         }; 
+        this._listeners = {
+            maxrules: new Array(),
+            rule: new Array(),
+            folds: new Array()
+        };
 
         viewport.setOnInputClicked( (i)=>{this.incrementInput(i);} );
     }
+
+    on( event, func ) {
+        if( typeof func === 'function' 
+            && typeof this._listeners[event] !== 'undefined' ) {
+            this._listeners[event].push( func );
+        }
+    }
+
     update() {
         if( this.autoUpdate )
             this.render();
@@ -49,11 +62,20 @@ class UIController {
             change =true;
         }
 
-        if( change )
+        if( change ) {
             this.viewport.update();
+        }
 
         // Caching
         this._oldopts =JSON.parse( JSON.stringify( this._opts ) );
+    }
+
+    nextRule() {
+        this.rule++;
+    }
+
+    previousRule() {
+        this.rule--;
     }
 
     step() {
@@ -86,7 +108,7 @@ class UIController {
             }
             i =0;
         }
-        this._opts.folds -= delta;
+        this._opts.folds -= this._opts.folds === 0 ? 0 : delta;
         input[i] = (input[i] === (this._opts.base - 1)) ? 0 : input[i]+1;
 //        console.log( 'picked input ' + i + " new array" + input );
         this.render();
@@ -105,15 +127,40 @@ class UIController {
     get viewmode()      { return this._viewmode; }
     set viewmode(m)     { this._viewmode =m;  this.update(); }
     get mode()          { return this._opts.mode; }
-    set mode(i)         { this._opts.mode =i; this.update(); }
+    set mode(i)         { 
+        this._opts.mode =i; 
+        this._emit( 'maxrules', Automaton.maxRules( this._opts.base, i ) ); 
+        this.update(); 
+    }
     get base()          { return this._opts.base; }
-    set base(i)         { this._opts.base =i; this.update(); }
+    set base(i)         { 
+        this._opts.base =i; 
+        this._emit( 'maxrules', Automaton.maxRules( i, this._opts.mode ) ); 
+        this.update(); 
+    }
     get folded()        { return this._folded; }
     set folded(b)       { this._folded =b; this.update(); }
     get folds()         { return this._opts.folds; }
-    set folds(i)        { this._opts.folds =i; this.update(); }
+    set folds(i)        { this._opts.folds =i; this._emit( 'folds', i ); this.update(); }
     get rule()          { return this._opts.rule; }
-    set rule(i)         { if( i >= 0 && i < this._automaton.maxRules ) { this._opts.rule =i; this.update(); } }
+    set rule(i)         { 
+        if( i >= 0 && i < this._automaton.maxRules ) { 
+            this._opts.rule =i; 
+            this._emit( 'rule', i );
+            this.update(); 
+        } 
+    }
+
+    get inputSize()     { return this._opts.input.length; }
+    set inputSize(i)    { }
+
+    _emit( event, data ) {
+        let listeners = this._listeners[event];
+        if( typeof listeners === 'undefined' )
+            return;
+        for( const func of listeners )
+            func( data );
+    }
 }
 
 class App {
@@ -161,17 +208,10 @@ class App {
 
         let step_ctrls = this.menubar.addGroup().floatCenter();
         let rule_label =null;
-        step_ctrls.addButton( '', 'fa fa-backward' ).action( 
-                ()=> {
-                    this.controller.rule = this.controller.rule - 1;
-                    rule_label.text = 'Rule #' + this.controller.rule;
-                } );
+        step_ctrls.addButton( '', 'fa fa-backward' ).action( ()=> { this.controller.previousRule(); } );
         rule_label = step_ctrls.addLink( 'Rule #' + this.controller.rule );
-        step_ctrls.addButton( '', 'fa fa-forward' ).action( 
-                ()=> {
-                    this.controller.rule = this.controller.rule + 1;
-                    rule_label.text = 'Rule #' + this.controller.rule;
-                } );
+        this.controller.on( 'rule', (r)=> { rule_label.text = 'Rule #' + r; } );
+        step_ctrls.addButton( '', 'fa fa-forward' ).action( ()=> { this.controller.nextRule(); } );
 
         let r_ctrls = this.menubar.addGroup().floatRight();
         r_ctrls.addButton( '', 'fa fa-arrows-alt' );
@@ -187,7 +227,11 @@ class App {
         let f_a = this.toolbox.addFolder( 'Automaton' );
         f_a.add( this.controller, 'mode', 2, 2 ).step(1).name( 'Mode' );
         f_a.add( this.controller, 'base', 2, 4 ).step(1).name( 'Base' );
-        f_a.add( this.controller, 'folds').name( '#Folds' );
+        let rule_ctrl = f_a.add( this.controller, 'rule', 0, 15 ).name( 'Rule' ).step(1);
+        this.controller.on( 'maxrules', (i)=>{ rule_ctrl.max(i); rule_ctrl.updateDisplay() } );
+        this.controller.on( 'rule' , (i)=>{ rule_ctrl.updateDisplay(); } );
+        f_a.add( this.controller, 'folds', 0, 500 ).name( '#Folds' ).step(1).listen();
+        f_a.add( this.controller, 'inputSize').name( 'Input size' ).step(1).listen();
         f_a.open();
 
         // Visualisation toolbox
@@ -202,11 +246,13 @@ class App {
         f_c.addColor( this.controller, 'color1' ).name( '1' );
         f_c.addColor( this.controller, 'color2' ).name( '2' );
         f_c.addColor( this.controller, 'color3' ).name( '3' );
-        f_c.open();
+        //f_c.open();
 
         // Render toolbox
         let f_r = this.toolbox.addFolder( 'Render' );
         f_r.add( this.controller, 'autoUpdate' ).name( 'Auto-update' );
+        f_r.add( this.viewport, 'animated' ).name( 'Animate' );
+        f_r.add( this.viewport, 'animationType', { Rows: 'rows', Ordered: 'ordered' } ).name( 'Animation' );
         f_r.add( this.controller, 'render' ).name( 'Render' );
     }
 }

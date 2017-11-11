@@ -117,11 +117,22 @@ return /******/ (function(modules) { // webpackBootstrap
 	            rule: 6,
 	            input: [0, 1, 1, 0, 0, 1, 0]
 	        };
+	        this._listeners = {
+	            maxrules: new Array(),
+	            rule: new Array(),
+	            folds: new Array()
+	        };
 	
 	        viewport.setOnInputClicked(function (i) {
 	            _this.incrementInput(i);
 	        });
 	    }
+	
+	    UIController.prototype.on = function on(event, func) {
+	        if (typeof func === 'function' && typeof this._listeners[event] !== 'undefined') {
+	            this._listeners[event].push(func);
+	        }
+	    };
 	
 	    UIController.prototype.update = function update() {
 	        if (this.autoUpdate) this.render();
@@ -149,10 +160,20 @@ return /******/ (function(modules) { // webpackBootstrap
 	            change = true;
 	        }
 	
-	        if (change) this.viewport.update();
+	        if (change) {
+	            this.viewport.update();
+	        }
 	
 	        // Caching
 	        this._oldopts = JSON.parse(JSON.stringify(this._opts));
+	    };
+	
+	    UIController.prototype.nextRule = function nextRule() {
+	        this.rule++;
+	    };
+	
+	    UIController.prototype.previousRule = function previousRule() {
+	        this.rule--;
 	    };
 	
 	    UIController.prototype.step = function step() {
@@ -183,7 +204,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	            }
 	            i = 0;
 	        }
-	        this._opts.folds -= delta;
+	        this._opts.folds -= this._opts.folds === 0 ? 0 : delta;
 	        input[i] = input[i] === this._opts.base - 1 ? 0 : input[i] + 1;
 	        //        console.log( 'picked input ' + i + " new array" + input );
 	        this.render();
@@ -191,6 +212,27 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	    // Properties
 	
+	
+	    UIController.prototype._emit = function _emit(event, data) {
+	        var listeners = this._listeners[event];
+	        if (typeof listeners === 'undefined') return;
+	        for (var _iterator = listeners, _isArray = Array.isArray(_iterator), _i = 0, _iterator = _isArray ? _iterator : _iterator[Symbol.iterator]();;) {
+	            var _ref;
+	
+	            if (_isArray) {
+	                if (_i >= _iterator.length) break;
+	                _ref = _iterator[_i++];
+	            } else {
+	                _i = _iterator.next();
+	                if (_i.done) break;
+	                _ref = _i.value;
+	            }
+	
+	            var func = _ref;
+	
+	            func(data);
+	        }
+	    };
 	
 	    _createClass(UIController, [{
 	        key: "color0",
@@ -238,7 +280,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	            return this._opts.mode;
 	        },
 	        set: function set(i) {
-	            this._opts.mode = i;this.update();
+	            this._opts.mode = i;
+	            this._emit('maxrules', _automaton2.default.maxRules(this._opts.base, i));
+	            this.update();
 	        }
 	    }, {
 	        key: "base",
@@ -246,7 +290,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	            return this._opts.base;
 	        },
 	        set: function set(i) {
-	            this._opts.base = i;this.update();
+	            this._opts.base = i;
+	            this._emit('maxrules', _automaton2.default.maxRules(i, this._opts.mode));
+	            this.update();
 	        }
 	    }, {
 	        key: "folded",
@@ -262,7 +308,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	            return this._opts.folds;
 	        },
 	        set: function set(i) {
-	            this._opts.folds = i;this.update();
+	            this._opts.folds = i;this._emit('folds', i);this.update();
 	        }
 	    }, {
 	        key: "rule",
@@ -271,18 +317,26 @@ return /******/ (function(modules) { // webpackBootstrap
 	        },
 	        set: function set(i) {
 	            if (i >= 0 && i < this._automaton.maxRules) {
-	                this._opts.rule = i;this.update();
+	                this._opts.rule = i;
+	                this._emit('rule', i);
+	                this.update();
 	            }
 	        }
+	    }, {
+	        key: "inputSize",
+	        get: function get() {
+	            return this._opts.input.length;
+	        },
+	        set: function set(i) {}
 	    }]);
 	
 	    return UIController;
 	}();
 	
 	var App = function () {
-	    function App(_ref) {
-	        var _ref$container_id = _ref.container_id,
-	            container_id = _ref$container_id === undefined ? '' : _ref$container_id;
+	    function App(_ref2) {
+	        var _ref2$container_id = _ref2.container_id,
+	            container_id = _ref2$container_id === undefined ? '' : _ref2$container_id;
 	
 	        _classCallCheck(this, App);
 	
@@ -332,13 +386,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var step_ctrls = this.menubar.addGroup().floatCenter();
 	        var rule_label = null;
 	        step_ctrls.addButton('', 'fa fa-backward').action(function () {
-	            _this2.controller.rule = _this2.controller.rule - 1;
-	            rule_label.text = 'Rule #' + _this2.controller.rule;
+	            _this2.controller.previousRule();
 	        });
 	        rule_label = step_ctrls.addLink('Rule #' + this.controller.rule);
+	        this.controller.on('rule', function (r) {
+	            rule_label.text = 'Rule #' + r;
+	        });
 	        step_ctrls.addButton('', 'fa fa-forward').action(function () {
-	            _this2.controller.rule = _this2.controller.rule + 1;
-	            rule_label.text = 'Rule #' + _this2.controller.rule;
+	            _this2.controller.nextRule();
 	        });
 	
 	        var r_ctrls = this.menubar.addGroup().floatRight();
@@ -359,7 +414,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var f_a = this.toolbox.addFolder('Automaton');
 	        f_a.add(this.controller, 'mode', 2, 2).step(1).name('Mode');
 	        f_a.add(this.controller, 'base', 2, 4).step(1).name('Base');
-	        f_a.add(this.controller, 'folds').name('#Folds');
+	        var rule_ctrl = f_a.add(this.controller, 'rule', 0, 15).name('Rule').step(1);
+	        this.controller.on('maxrules', function (i) {
+	            rule_ctrl.max(i);rule_ctrl.updateDisplay();
+	        });
+	        this.controller.on('rule', function (i) {
+	            rule_ctrl.updateDisplay();
+	        });
+	        f_a.add(this.controller, 'folds', 0, 500).name('#Folds').step(1).listen();
+	        f_a.add(this.controller, 'inputSize').name('Input size').step(1).listen();
 	        f_a.open();
 	
 	        // Visualisation toolbox
@@ -376,11 +439,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	        f_c.addColor(this.controller, 'color1').name('1');
 	        f_c.addColor(this.controller, 'color2').name('2');
 	        f_c.addColor(this.controller, 'color3').name('3');
-	        f_c.open();
+	        //f_c.open();
 	
 	        // Render toolbox
 	        var f_r = this.toolbox.addFolder('Render');
 	        f_r.add(this.controller, 'autoUpdate').name('Auto-update');
+	        f_r.add(this.viewport, 'animated').name('Animate');
+	        f_r.add(this.viewport, 'animationType', { Rows: 'rows', Ordered: 'ordered' }).name('Animation');
 	        f_r.add(this.controller, 'render').name('Render');
 	    };
 	
@@ -462,6 +527,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	    Automaton.prototype.rowLength = function rowLength(i) {
 	        return this._rows[i].length;
+	    };
+	
+	    Automaton.maxRules = function maxRules(base, mode) {
+	        var rulesize = Math.pow(base, mode);
+	        return Math.pow(base, rulesize);
 	    };
 	
 	    /*
@@ -794,7 +864,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        };
 	        this._animation = {
 	            animateGeometry: true,
-	            mode: 'rows', //  one of 'rows', 'ordered'
+	            type: 'rows', //  one of 'rows', 'ordered'
 	            done: false,
 	            node: { col: 0, row: 0 },
 	            row: 0
@@ -1089,14 +1159,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var automaton = this.automaton;
 	        if (automaton === null) return;
 	
-	        if (this._animation.mode === 'ordered') {
+	        if (this._animation.type === 'ordered') {
 	            var node = this._animation.node;
 	            var color = this._nodeColor(node);
 	            var offset = this._calcNodeOffset(node);
 	
 	            this._setColor(offset, color);
 	            if ((0, _value_equals2.default)(node, automaton.last())) this._animation.done = true;else this._animation.node = automaton.next(node);
-	        } else if (this._animation.mode === 'rows') {
+	        } else if (this._animation.type === 'rows') {
 	            var row = this._animation.row;
 	            for (var j = 0; j < automaton.rowLength(row); j++) {
 	                var _node = { col: j, row: row };
@@ -1292,6 +1362,22 @@ return /******/ (function(modules) { // webpackBootstrap
 	            }
 	            this._viewmode = m;
 	            //this.updateGeometry();
+	        }
+	    }, {
+	        key: "animationType",
+	        set: function set(t) {
+	            this._animation.type = t;
+	        },
+	        get: function get() {
+	            return this._animation.type;
+	        }
+	    }, {
+	        key: "animated",
+	        set: function set(b) {
+	            this._animation.animateGeometry = b;
+	        },
+	        get: function get() {
+	            return this._animation.animateGeometry;
 	        }
 	    }]);
 	
