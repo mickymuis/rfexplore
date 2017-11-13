@@ -105,7 +105,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	        this.viewport = viewport;
 	        this.autoUpdate = true;
-	        this._viewmode = 'circle';
+	        this._viewmode = 'stack';
 	        this._folded = false;
 	        this._palette = ['#ff5511', '#33ffcc', '#ffaa33', '#5E69FF'];
 	        this._automaton = null;
@@ -115,7 +115,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	            base: 2,
 	            folds: 0,
 	            rule: 6,
-	            input: [0, 1, 1, 0, 0, 1, 0]
+	            input: [0, 1, 1, 0, 0, 1, 0],
+	            foldToRight: false
 	        };
 	        this._listeners = {
 	            maxrules: new Array(),
@@ -300,7 +301,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	            return this._folded;
 	        },
 	        set: function set(b) {
-	            this._folded = b;this.update();
+	            this._folded = b == 'true' || b == true;this.update();
 	        }
 	    }, {
 	        key: "folds",
@@ -309,6 +310,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	        },
 	        set: function set(i) {
 	            this._opts.folds = i;this._emit('folds', i);this.update();
+	        }
+	    }, {
+	        key: "foldToRight",
+	        get: function get() {
+	            return this._opts.foldToRight;
+	        },
+	        set: function set(b) {
+	            this._opts.foldToRight = b == 'true' || b == true;this.update();
 	        }
 	    }, {
 	        key: "rule",
@@ -401,7 +410,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	        r_ctrls.addButton('', 'fa fa-step-forward').action(function () {
 	            _this2.controller.step();
 	        });
-	        r_ctrls.addButton('Render', 'fa fa-camera-retro');
+	        r_ctrls.addButton('Render', 'fa fa-camera-retro').action(function () {
+	            _this2.controller.render();
+	        });
 	        r_ctrls.addLink('', 'fa fa-circle-o');
 	    };
 	
@@ -422,12 +433,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	            rule_ctrl.updateDisplay();
 	        });
 	        f_a.add(this.controller, 'folds', 0, 500).name('#Folds').step(1).listen();
+	        f_a.add(this.controller, 'foldToRight', { Left: false, Right: true }).name('Fold');
 	        f_a.add(this.controller, 'inputSize').name('Input size').step(1).listen();
 	        f_a.open();
 	
 	        // Visualisation toolbox
 	        var f_v = this.toolbox.addFolder('Visualisation');
-	        f_v.add(this.controller, 'viewmode', { Brick: 'brick', Diamond: 'diamond', Circle: 'circle' }).name('Cell shape');
+	        f_v.add(this.controller, 'viewmode', { Brick: 'brick', Diamond: 'diamond', Circle: 'circle', Stack: 'stack' }).name('Cell shape');
 	        f_v.add(this.controller, 'folded').name('Folded');
 	        f_v.open();
 	
@@ -444,8 +456,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	        // Render toolbox
 	        var f_r = this.toolbox.addFolder('Render');
 	        f_r.add(this.controller, 'autoUpdate').name('Auto-update');
-	        f_r.add(this.viewport, 'animated').name('Animate');
-	        f_r.add(this.viewport, 'animationType', { Rows: 'rows', Ordered: 'ordered' }).name('Animation');
+	        f_r.add(this.viewport, 'animateSpin').name('Spin');
+	        f_r.add(this.viewport, 'animateDraw').name('Animate draw');
+	        f_r.add(this.viewport, 'animateDrawType', { Rows: 'rows', Ordered: 'ordered' }).name('Draw type');
 	        f_r.add(this.controller, 'render').name('Render');
 	    };
 	
@@ -475,7 +488,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	     * Constructs a new Automaton given 'opts' and generates a transition table 
 	     */
 	    function Automaton() {
-	        var _ref = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [],
+	        var _ref = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {},
 	            _ref$base = _ref.base,
 	            base = _ref$base === undefined ? 2 : _ref$base,
 	            _ref$mode = _ref.mode,
@@ -824,8 +837,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        _classCallCheck(this, Viewport);
 	
 	        this.container = elem;
-	        this.disabledColor = '#aaaaaa';
-	        this.backgroundColor = '#bbbbbb';
+	        this.backgroundColor = '#999999';
 	
 	        this.automaton = null;
 	        // fixme: remove
@@ -846,26 +858,28 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this._raycaster = new THREE.Raycaster();
 	        this._mouse = new THREE.Vector2();
 	        this._model = {
-	            geometry: null,
-	            attr_normal: null,
-	            buf_normal: null,
-	            attr_color: null,
-	            buf_color: null,
-	            attr_position: null,
-	            buf_position: null,
-	            offset: 0,
-	            template_size: 0,
-	            node_count: 0,
-	            mesh: null,
-	            viewmode: null,
-	            mode: 0,
-	            input_pickers: null,
-	            picked: null
+	            geometry: null, // BufferGeometry reference
+	            attr_normal: null, // BufferAttribute for normal
+	            buf_normal: null, // Int16Array with normals
+	            attr_color: null, // BufferAttribute for color
+	            buf_color: null, // Uint8Array with color data
+	            attr_position: null, // BufferAttribute for position
+	            buf_position: null, // Float32Array with position data
+	            offset: 0, // Pointer after the last element
+	            template_size: 0, // Elements in the template geometry
+	            node_count: 0, // Total number of nodes in the geometry
+	            mesh: null, // Mesh reference to the final object
+	            viewmode: null, // Viewmode used to construct geometry
+	            mode: 0, // Mode used to contruct geometry
+	            input_pickers: null, // Array of Meshes 
+	            picked: null, // Reference to the picked Mesh
+	            right: false // Pivot is at right hand side
 	        };
 	        this._animation = {
-	            animateGeometry: true,
-	            type: 'rows', //  one of 'rows', 'ordered'
-	            done: false,
+	            spin: true,
+	            animateDraw: true,
+	            drawType: 'rows', //  one of 'rows', 'ordered'
+	            drawDone: false,
 	            node: { col: 0, row: 0 },
 	            row: 0
 	        };
@@ -883,13 +897,23 @@ return /******/ (function(modules) { // webpackBootstrap
 	    Viewport.prototype.animate = function animate() {
 	        var _this = this;
 	
-	        if (this._animation.done) return;
-	        requestAnimationFrame(function () {
+	        var req = false; // request new frame
+	
+	        if (!this._animation.drawDone) {
+	            this._updateCellsAnimated();
+	            req = true;
+	        }
+	        if (this._animation.spin && this._viewmode === 'folded') {
+	            this._model.mesh.rotateY(0.002);
+	            req = true;
+	        }
+	
+	        this._controls.update();
+	        this.render();
+	
+	        if (req) requestAnimationFrame(function () {
 	            _this.animate();
 	        });
-	        this._controls.update();
-	        this._updateCellsAnimated();
-	        this.render();
 	    };
 	
 	    Viewport.prototype.init = function init() {
@@ -900,17 +924,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this._scene = new THREE.Scene();
 	        this._scene.background = new THREE.Color(this.backgroundColor);
 	        this._aspect = this.viewportWidth / this.viewportHeight;
-	        this._cameraPersp = new THREE.PerspectiveCamera(75, this._aspect, 0.1, 1000);
+	        this._cameraPersp = new THREE.PerspectiveCamera(35, this._aspect, 0.1, 3000);
 	        this._cameraOrtho = new THREE.OrthographicCamera(this._aspect * this._sceneHeight / -2, this._aspect * this._sceneHeight / 2, -this._sceneHeight / 2, this._sceneHeight / 2);
 	
 	        this._renderer = new THREE.WebGLRenderer({ antialias: true });
 	        this._renderer.setSize(this.viewportWidth, this.viewportHeight);
 	        this.container.appendChild(this._renderer.domElement);
 	
-	        /*let geometry = new THREE.BoxGeometry( 1, 1, 1 );
-	        let material = new THREE.MeshNormalMaterial();
-	        let cube = new THREE.Mesh( geometry, material );
-	        this._scene.add( cube );*/
 	        this._cameraOrtho.position.z = 10;
 	        this._cameraPersp.position.z = 10;
 	
@@ -919,7 +939,6 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this._controls.addEventListener('change', function () {
 	            _this2.render();
 	        });
-	        //controls.enableRotate = false;
 	
 	        // Setup lights for the 3d view
 	        var lights = this._lights;
@@ -930,22 +949,16 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	        lights[1] = new THREE.DirectionalLight(0xEDE2C7);
 	        lights[1].position.set(10, 10, 10);
-	        //lights[1].target = new THREE.Vector3( 0, 0, 0 );
 	        this._scene.add(lights[1]);
 	
 	        lights[2] = new THREE.DirectionalLight(0xC7E8ED);
 	        lights[2].position.set(0, -10, -10);
-	        //lights[2].target = new THREE.Vector3( 0, 0, 0 );
 	        this._scene.add(lights[2]);
 	
 	        lights[3] = new THREE.DirectionalLight(0xC8D9C8);
 	        lights[3].position.set(-10, 10, 0);
-	        // lights[3].target = new THREE.Vector3( 0, 0, 0 );
 	        this._scene.add(lights[3]);
 	
-	        //     this._scene.add( new THREE.DirectionalLightHelper( lights[0], 0.2 ));
-	        //     this._scene.add( new THREE.DirectionalLightHelper( lights[1], 0.2 ));
-	        //     this._scene.add( new THREE.DirectionalLightHelper( lights[2], 0.2 ));
 	        this.render();
 	
 	        window.addEventListener('resize', function () {
@@ -963,6 +976,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var sceneHeight = this._sceneHeight;
 	        var aspect = this._aspect;
 	        this._cameraPersp.aspect = aspect;
+	        this._cameraPersp.position.z = 1.2 * (sceneHeight / 2) / Math.tan(this._cameraPersp.fov / 360 * Math.PI);
 	        this._cameraPersp.updateProjectionMatrix();
 	        this._cameraOrtho.left = aspect * sceneHeight / -2;
 	        this._cameraOrtho.right = aspect * sceneHeight / 2;
@@ -986,26 +1000,25 @@ return /******/ (function(modules) { // webpackBootstrap
 	    };
 	
 	    Viewport.prototype.update = function update() {
-	        var automaton = this.automaton;
-	        if (automaton === null) return;
+	        if (this.automaton === null) return;
 	        // See if we need to update the geometry at all, criteria are:
 	        // - Different viewmode
 	        // - More cells 
 	        // - Different mode
-	        if (this._viewmode !== this._model.viewmode || this.automaton.opts.mode !== this._model.mode || this.automaton.nodeCount != this._model.node_count) {
+	        // - Pivoit position
+	        if (this._viewmode !== this._model.viewmode || this.automaton.opts.mode !== this._model.mode || this.automaton.nodeCount !== this._model.node_count || !this.automaton.opts.foldToRight !== this._model.right) {
 	            console.log('Viewport: rebuilding geometry');
-	            var populate = !this._animation.animateGeometry;
+	            var populate = !this._animation.animateDraw;
 	            this._updateGeometry(populate);
 	        } else {
-	            if (!this._animation.animateGeometry) this._updateCells();
+	            if (!this._animation.animateDraw) this._updateCells();
 	        }
-	        if (this._animation.animateGeometry) {
+	        if (this._animation.animateDraw) {
 	            this._updateCells(true);
-	            this._animation.node = automaton.first();this._animation.row = 0;
-	            this._animation.done = false;
-	            this.animate();
+	            this._animation.node = this.automaton.first();this._animation.row = 0;
+	            this._animation.drawDone = false;
 	        }
-	        this.render();
+	        this.animate();
 	    };
 	
 	    //
@@ -1159,14 +1172,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var automaton = this.automaton;
 	        if (automaton === null) return;
 	
-	        if (this._animation.type === 'ordered') {
+	        if (this._animation.drawType === 'ordered') {
 	            var node = this._animation.node;
 	            var color = this._nodeColor(node);
 	            var offset = this._calcNodeOffset(node);
 	
 	            this._setColor(offset, color);
-	            if ((0, _value_equals2.default)(node, automaton.last())) this._animation.done = true;else this._animation.node = automaton.next(node);
-	        } else if (this._animation.type === 'rows') {
+	            if ((0, _value_equals2.default)(node, automaton.last())) this._animation.drawDone = true;else this._animation.node = automaton.next(node);
+	        } else if (this._animation.drawType === 'rows') {
 	            var row = this._animation.row;
 	            for (var j = 0; j < automaton.rowLength(row); j++) {
 	                var _node = { col: j, row: row };
@@ -1174,7 +1187,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	                var _offset = this._calcNodeOffset(_node);
 	                this._setColor(_offset, _color);
 	            }
-	            if (row + 1 === automaton.rows) this._animation.done = true;else this._animation.row++;
+	            if (row + 1 === automaton.rows) this._animation.drawDone = true;else this._animation.row++;
 	        }
 	
 	        // Update the buffer
@@ -1193,7 +1206,6 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var automaton = this.automaton;
 	        if (automaton === null) return;
 	        var viewmode = this._viewmode;
-	        var right = !automaton.opts.foldToRight; // Position of the pivot
 	
 	        // Cleanup from previous calls
 	        //
@@ -1222,15 +1234,25 @@ return /******/ (function(modules) { // webpackBootstrap
 	            material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, vertexColors: THREE.VertexColors });
 	            if (viewmode === 'brick') {
 	                template = new THREE.PlaneBufferGeometry(1, 1);
+	                template = template.toNonIndexed();
 	            } else if (viewmode === 'diamond') {
 	                template = new THREE.PlaneBufferGeometry(1, 1);
 	                template.rotateZ(Math.PI * 0.25);
 	                template.scale(1 / diamondWidth, 1, 1);
+	                template = template.toNonIndexed();
 	            } else if (viewmode === 'circle') {
 	                template = new THREE.CircleBufferGeometry(0.5, 32);
+	                template = template.toNonIndexed();
+	            } else if (viewmode === 'stack') {
+	                template = new THREE.BufferGeometry();
+	                var positions = new Float32Array([Math.cos(2 / 3 * Math.PI), 0.0, Math.sin(2 / 3 * Math.PI), Math.cos(4 / 3 * Math.PI), 0.0, Math.sin(4 / 3 * Math.PI), Math.cos(0), 0.0, Math.sin(0)]);
+	                /*         let normals = new Float32Array( [
+	                                 0.0, 0.0, 1.0,
+	                                 0.0, 0.0, 1.0,
+	                                 0.0, 0.0, 1.0 ] );*/
+	                template.addAttribute('position', new THREE.BufferAttribute(positions, 3));
 	            }
 	
-	            template = template.toNonIndexed();
 	            M.template_size = template.getAttribute('position').array.length;
 	        } else {
 	            material = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, vertexColors: THREE.VertexColors, metalness: 0 });
@@ -1248,10 +1270,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	        M.buf_normal = new Int16Array(array_size);
 	        M.offset = 0;
 	        M.node_count = automaton.nodeCount;
+	        M.right = !automaton.opts.foldToRight; // Position of the pivot
 	
 	        var addInstance = function addInstance(color, translate) {
 	            var positions = template.getAttribute('position').array;
-	            var normals = template.getAttribute('normal').array;
+	            var normals = null;
+	            if (viewmode === 'folded') normals = template.getAttribute('normal').array;
 	            for (var _i = 0; _i < M.template_size; _i += 3) {
 	                M.buf_position[M.offset + _i] = positions[_i] + translate.x;
 	                M.buf_position[M.offset + _i + 1] = positions[_i + 1] + translate.y;
@@ -1261,34 +1285,41 @@ return /******/ (function(modules) { // webpackBootstrap
 	                M.buf_color[M.offset + _i + 1] = color.g * 255;
 	                M.buf_color[M.offset + _i + 2] = color.b * 255;
 	
-	                M.buf_normal[M.offset + _i] = normals[_i] * 32767;
-	                M.buf_normal[M.offset + _i + 1] = normals[_i + 1] * 32767;
-	                M.buf_normal[M.offset + _i + 2] = normals[_i + 2] * 32767;
+	                if (viewmode === 'folded') {
+	                    M.buf_normal[M.offset + _i] = normals[_i] * 32767;
+	                    M.buf_normal[M.offset + _i + 1] = normals[_i + 1] * 32767;
+	                    M.buf_normal[M.offset + _i + 2] = normals[_i + 2] * 32767;
+	                }
 	            }
 	            M.offset += positions.length;
 	        };
 	
 	        var foldedPosition = function foldedPosition(row, col, width, inputLength, right, mode) {
-	            var p = new THREE.Vector3(0, 0, 0);
+	            var noY = arguments.length > 6 && arguments[6] !== undefined ? arguments[6] : false;
+	
 	            // The pivot position determines where the rows start
-	            var coneCol = right ? width - 1 - col : col;
+	            //let coneCol = right ? (width-1) - col : col;
 	            // Map the `triangle row' onto the `diagonal row'
-	            var coneRow = row + coneCol;
+	            //let coneRow = row + coneCol;
+	            var coneRow = right ? row + (width - 1) - col : row + col;
+	            var coneCol = right ? row : coneRow - col;
 	            var fold = !(coneRow < inputLength);
-	            var coneRowWidth = coneRow + (fold ? 0 : 1);
+	            var coneRowWidth = coneRow + (fold ? 0 : 1); // FIXME: support for mode > 2
 	
 	            // Calculate the position of the node on the `cone'
-	            var offset = 0; //(coneRow%2 === 0) ? 0.125 : -0.125;
-	            var phi = (coneCol + offset) * (2 * Math.PI / coneRowWidth);
-	            var radius = coneRowWidth / Math.PI;
+	            var calcPosition = function calcPosition(offset) {
+	                var p = new THREE.Vector3(0, 0, 0);
+	                var phi = (coneCol + offset) * (2 * Math.PI / coneRowWidth);
+	                var fold_offset = (coneCol + offset) / coneRowWidth;
+	                var radius = (coneRowWidth + fold_offset) / Math.PI;
 	
-	            p.x = Math.cos(phi) * radius;
-	            p.z = Math.sin(phi) * radius;
+	                p.x = Math.cos(phi) * radius;
+	                p.z = Math.sin(phi) * radius;
 	
-	            var yoffset = 2 * coneCol / coneRowWidth;
-	            p.y = -coneRow * 2 + (fold ? yoffset : 0);
-	
-	            return p;
+	                p.y = -coneRow * 2 - (fold && !noY ? 2 * fold_offset : 0);
+	                return p;
+	            };
+	            return new Array(calcPosition(0), calcPosition(1));
 	        };
 	
 	        var heightstep = 1.0;
@@ -1301,9 +1332,28 @@ return /******/ (function(modules) { // webpackBootstrap
 	            for (var j = 0; j < automaton.rowLength(_i2); j++) {
 	                position.x = -automaton.width / 2 + 0.5 * _i2 + j;
 	
-	                var color = populate ? this._nodeColor({ row: _i2, col: _i2 }) : new THREE.Color(this.backgroundColor);
+	                var color = populate ? this._nodeColor({ row: _i2, col: j }) : new THREE.Color(this.backgroundColor);
 	
-	                if (viewmode !== 'folded') {
+	                if (viewmode === 'folded') {
+	                    var p = foldedPosition(_i2, j, automaton.rowLength(_i2), automaton.opts.input.length, M.right, automaton.opts.mode, false)[0];
+	                    p.y += automaton.width;
+	                    addInstance(color, p);
+	                } else if (viewmode === 'stack') {
+	                    var ps = foldedPosition(_i2, j, automaton.rowLength(_i2), automaton.opts.input.length, M.right, automaton.opts.mode, true);
+	                    // swap y and z
+	                    var t = ps[0].y;
+	                    ps[0].y = ps[0].z;
+	                    ps[0].z = t;
+	                    t = ps[1].y;
+	                    ps[1].y = ps[1].z;
+	                    ps[1].z = t;
+	                    // Use these positions to place the triangle
+	                    var tri = template.getAttribute('position').array;
+	                    tri[0] = 0.0;tri[1] = 0.0;tri[2] = ps[0].z; // x y z
+	                    tri[3] = ps[0].x;tri[4] = ps[0].y;tri[5] = ps[0].z; // x y z
+	                    tri[6] = ps[1].x;tri[7] = ps[1].y;tri[8] = ps[1].z; // x y z
+	                    addInstance(color, new THREE.Vector3(0, 0, 0));
+	                } else {
 	                    // Add an instance to the main geometry
 	                    addInstance(color, position);
 	
@@ -1318,21 +1368,20 @@ return /******/ (function(modules) { // webpackBootstrap
 	                        this._scene.add(picker_mesh);
 	                        M.input_pickers.push(picker_mesh);
 	                    }
-	                } else {
-	                    var p = foldedPosition(_i2, j, automaton.rowLength(_i2), automaton.opts.input.length, right, automaton.opts.mode);
-	                    addInstance(color, p);
 	                }
 	            }
 	            position.y -= heightstep;
 	        }
 	        M.attr_position = new THREE.BufferAttribute(M.buf_position, 3);
-	        M.attr_normal = new THREE.BufferAttribute(M.buf_normal, 3);
 	        M.attr_color = new THREE.BufferAttribute(M.buf_color, 3);
 	        M.attr_color.normalized = true;
-	        M.attr_normal.normalized = true;
 	        M.geometry.addAttribute('position', M.attr_position);
-	        M.geometry.addAttribute('normal', M.attr_normal);
 	        M.geometry.addAttribute('color', M.attr_color);
+	        if (viewmode === 'folded') {
+	            M.attr_normal = new THREE.BufferAttribute(M.buf_normal, 3);
+	            M.attr_normal.normalized = true;
+	            M.geometry.addAttribute('normal', M.attr_normal);
+	        }
 	        M.geometry.computeBoundingSphere();
 	
 	        M.mesh = new THREE.Mesh(M.geometry, material);
@@ -1341,7 +1390,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	        M.viewmode = viewmode;
 	        M.mode = automaton.opts.mode;
 	
-	        this._sceneHeight = automaton.width * 1.1;
+	        if (viewmode === 'folded') this._sceneHeight = automaton.width * 2;else if (viewmode === 'stack') this._sceneHeight = automaton.width * 0.8;else this._sceneHeight = automaton.width * 1.1;
+	
 	        this.updateCamera();
 	    };
 	
@@ -1364,20 +1414,28 @@ return /******/ (function(modules) { // webpackBootstrap
 	            //this.updateGeometry();
 	        }
 	    }, {
-	        key: "animationType",
+	        key: "animateDrawType",
 	        set: function set(t) {
-	            this._animation.type = t;
+	            this._animation.drawType = t;
 	        },
 	        get: function get() {
-	            return this._animation.type;
+	            return this._animation.drawType;
 	        }
 	    }, {
-	        key: "animated",
+	        key: "animateSpin",
 	        set: function set(b) {
-	            this._animation.animateGeometry = b;
+	            this._animation.spin = b;if (b) this.animate();
 	        },
 	        get: function get() {
-	            return this._animation.animateGeometry;
+	            return this._animation.spin;
+	        }
+	    }, {
+	        key: "animateDraw",
+	        set: function set(b) {
+	            this._animation.animateDraw = b;
+	        },
+	        get: function get() {
+	            return this._animation.animateDraw;
 	        }
 	    }]);
 	

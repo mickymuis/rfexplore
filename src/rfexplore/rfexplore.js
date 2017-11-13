@@ -7,7 +7,7 @@ class UIController {
     constructor( viewport ) {
         this.viewport =viewport;
         this.autoUpdate =true;
-        this._viewmode ='circle';
+        this._viewmode ='stack';
         this._folded =false;
         this._palette = [ '#ff5511', '#33ffcc', '#ffaa33', '#5E69FF' ]; 
         this._automaton =null;
@@ -17,7 +17,8 @@ class UIController {
             base: 2,
             folds: 0,
             rule: 6,
-            input: [ 0, 1, 1, 0, 0, 1, 0 ]
+            input: [ 0, 1, 1, 0, 0, 1, 0 ],
+            foldToRight: false
         }; 
         this._listeners = {
             maxrules: new Array(),
@@ -139,9 +140,11 @@ class UIController {
         this.update(); 
     }
     get folded()        { return this._folded; }
-    set folded(b)       { this._folded =b; this.update(); }
+    set folded(b)       { this._folded =(b == 'true' || b == true); this.update(); }
     get folds()         { return this._opts.folds; }
     set folds(i)        { this._opts.folds =i; this._emit( 'folds', i ); this.update(); }
+    get foldToRight()   { return this._opts.foldToRight; }
+    set foldToRight(b)  { this._opts.foldToRight =(b == 'true' || b == true); this.update(); }
     get rule()          { return this._opts.rule; }
     set rule(i)         { 
         if( i >= 0 && i < this._automaton.maxRules ) { 
@@ -216,7 +219,7 @@ class App {
         let r_ctrls = this.menubar.addGroup().floatRight();
         r_ctrls.addButton( '', 'fa fa-arrows-alt' );
         r_ctrls.addButton( '', 'fa fa-step-forward' ).action( ()=>{ this.controller.step(); } );
-        r_ctrls.addButton( 'Render', 'fa fa-camera-retro' );
+        r_ctrls.addButton( 'Render', 'fa fa-camera-retro' ).action( ()=>{ this.controller.render(); } );
         r_ctrls.addLink( '', 'fa fa-circle-o' );
 
     }
@@ -231,12 +234,13 @@ class App {
         this.controller.on( 'maxrules', (i)=>{ rule_ctrl.max(i); rule_ctrl.updateDisplay() } );
         this.controller.on( 'rule' , (i)=>{ rule_ctrl.updateDisplay(); } );
         f_a.add( this.controller, 'folds', 0, 500 ).name( '#Folds' ).step(1).listen();
+        f_a.add( this.controller, 'foldToRight', { Left: false, Right: true } ).name( 'Fold' );
         f_a.add( this.controller, 'inputSize').name( 'Input size' ).step(1).listen();
         f_a.open();
 
         // Visualisation toolbox
         let f_v = this.toolbox.addFolder( 'Visualisation' );
-        f_v.add( this.controller, 'viewmode', { Brick : 'brick', Diamond: 'diamond', Circle: 'circle' } ).name( 'Cell shape' );
+        f_v.add( this.controller, 'viewmode', { Brick : 'brick', Diamond: 'diamond', Circle: 'circle', Stack: 'stack' } ).name( 'Cell shape' );
         f_v.add( this.controller, 'folded' ).name( 'Folded' );
         f_v.open();
 
@@ -251,8 +255,9 @@ class App {
         // Render toolbox
         let f_r = this.toolbox.addFolder( 'Render' );
         f_r.add( this.controller, 'autoUpdate' ).name( 'Auto-update' );
-        f_r.add( this.viewport, 'animated' ).name( 'Animate' );
-        f_r.add( this.viewport, 'animationType', { Rows: 'rows', Ordered: 'ordered' } ).name( 'Animation' );
+        f_r.add( this.viewport, 'animateSpin' ).name( 'Spin' );
+        f_r.add( this.viewport, 'animateDraw' ).name( 'Animate draw' );
+        f_r.add( this.viewport, 'animateDrawType', { Rows: 'rows', Ordered: 'ordered' } ).name( 'Draw type' );
         f_r.add( this.controller, 'render' ).name( 'Render' );
     }
 }

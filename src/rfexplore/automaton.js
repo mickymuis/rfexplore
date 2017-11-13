@@ -14,7 +14,7 @@ export default class Automaton {
             maxSteps = 0,
             folds = 0,
             foldToRight = false
-        } = []
+        } = {}
     ) {
         this.opts = {
             base: base,
@@ -41,6 +41,7 @@ export default class Automaton {
         this.ttable = this.makeTTable( base, mode, rule );
         this.nodeCount = this.width;
         this.inputSize = input.length;
+
     }
 
     /* 

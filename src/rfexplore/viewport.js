@@ -8,8 +8,7 @@ export default class Viewport {
     constructor( elem ) {
 
         this.container =elem;
-        this.disabledColor = '#aaaaaa';
-        this.backgroundColor = '#bbbbbb'
+        this.backgroundColor = '#999999'
         
         this.automaton = null;
         // fixme: remove
@@ -30,26 +29,28 @@ export default class Viewport {
         this._raycaster = new THREE.Raycaster();
         this._mouse = new THREE.Vector2();
         this._model = { 
-            geometry: null,
-            attr_normal: null,
-            buf_normal: null,
-            attr_color: null,
-            buf_color: null,
-            attr_position: null,
-            buf_position: null,
-            offset: 0,
-            template_size: 0,
-            node_count: 0,
-            mesh: null,
-            viewmode: null,
-            mode: 0,
-            input_pickers: null,
-            picked: null
+            geometry: null,     // BufferGeometry reference
+            attr_normal: null,  // BufferAttribute for normal
+            buf_normal: null,   // Int16Array with normals
+            attr_color: null,   // BufferAttribute for color
+            buf_color: null,    // Uint8Array with color data
+            attr_position: null,// BufferAttribute for position
+            buf_position: null, // Float32Array with position data
+            offset: 0,          // Pointer after the last element
+            template_size: 0,   // Elements in the template geometry
+            node_count: 0,      // Total number of nodes in the geometry
+            mesh: null,         // Mesh reference to the final object
+            viewmode: null,     // Viewmode used to construct geometry
+            mode: 0,            // Mode used to contruct geometry
+            input_pickers: null,// Array of Meshes 
+            picked: null,       // Reference to the picked Mesh
+            right: false        // Pivot is at right hand side
         };
         this._animation = {
-            animateGeometry: true,
-            type: 'rows', //  one of 'rows', 'ordered'
-            done: false,
+            spin: true,
+            animateDraw: true,
+            drawType: 'rows', //  one of 'rows', 'ordered'
+            drawDone: false,
             node: { col:0, row: 0 },
             row: 0
         };
@@ -66,12 +67,22 @@ export default class Viewport {
     }
 
     animate() { 
-        if( this._animation.done )
-            return;
-        requestAnimationFrame( ()=>{this.animate()} );
+        let req =false; // request new frame
+
+        if( !this._animation.drawDone ) {
+            this._updateCellsAnimated();
+            req =true;
+        }
+        if( this._animation.spin && this._viewmode === 'folded' ) {
+            this._model.mesh.rotateY( 0.002 );
+            req =true;
+        }
+
         this._controls.update();
-        this._updateCellsAnimated();
         this.render();
+        
+        if( req ) 
+            requestAnimationFrame( ()=>{this.animate()} );
     }
 
     init() {
@@ -80,7 +91,7 @@ export default class Viewport {
         this._scene = new THREE.Scene();
         this._scene.background = new THREE.Color( this.backgroundColor );
         this._aspect = this.viewportWidth / this.viewportHeight;
-        this._cameraPersp = new THREE.PerspectiveCamera( 75, this._aspect, 0.1, 1000 );
+        this._cameraPersp = new THREE.PerspectiveCamera( 35, this._aspect, 0.1, 3000 );
         this._cameraOrtho = new THREE.OrthographicCamera( 
                 this._aspect * this._sceneHeight / -2, 
                 this._aspect * this._sceneHeight / 2, 
@@ -90,17 +101,12 @@ export default class Viewport {
         this._renderer.setSize( this.viewportWidth, this.viewportHeight );
         this.container.appendChild( this._renderer.domElement );
 
-        /*let geometry = new THREE.BoxGeometry( 1, 1, 1 );
-        let material = new THREE.MeshNormalMaterial();
-        let cube = new THREE.Mesh( geometry, material );
-        this._scene.add( cube );*/
         this._cameraOrtho.position.z = 10;
         this._cameraPersp.position.z = 10;
 
         // Setup orbit controls
         this._controls = new THREE.OrbitControls( this._cameraPersp, this._renderer.domElement );
         this._controls.addEventListener( 'change', () => { this.render(); } );
-        //controls.enableRotate = false;
 
         // Setup lights for the 3d view
         let lights = this._lights;
@@ -111,22 +117,16 @@ export default class Viewport {
         
         lights[1] = new THREE.DirectionalLight( 0xEDE2C7 );
         lights[1].position.set( 10, 10, 10 );
-        //lights[1].target = new THREE.Vector3( 0, 0, 0 );
         this._scene.add( lights[1] );
         
         lights[2] = new THREE.DirectionalLight( 0xC7E8ED );
         lights[2].position.set( 0, -10, -10 );
-        //lights[2].target = new THREE.Vector3( 0, 0, 0 );
         this._scene.add( lights[2] );
         
         lights[3] = new THREE.DirectionalLight( 0xC8D9C8 );
         lights[3].position.set( -10, 10, 0 );
-       // lights[3].target = new THREE.Vector3( 0, 0, 0 );
         this._scene.add( lights[3] );
         
-   //     this._scene.add( new THREE.DirectionalLightHelper( lights[0], 0.2 ));
-   //     this._scene.add( new THREE.DirectionalLightHelper( lights[1], 0.2 ));
-   //     this._scene.add( new THREE.DirectionalLightHelper( lights[2], 0.2 ));
         this.render();
 
         window.addEventListener( 'resize', () => { this._onWindowResize(); } );
@@ -139,6 +139,9 @@ export default class Viewport {
         let sceneHeight = this._sceneHeight;
         let aspect = this._aspect;
         this._cameraPersp.aspect = aspect;
+        this._cameraPersp.position.z = 1.2
+            * (sceneHeight / 2 ) 
+            / Math.tan( this._cameraPersp.fov / 360 * Math.PI );
         this._cameraPersp.updateProjectionMatrix();
         this._cameraOrtho.left = aspect * sceneHeight / -2;
         this._cameraOrtho.right = aspect * sceneHeight / 2;
@@ -166,11 +169,14 @@ export default class Viewport {
 
     }
 
-    set animationType( t ) { this._animation.type = t;  }
-    get animationType() { return this._animation.type; }
+    set animateDrawType( t ) { this._animation.drawType = t;  }
+    get animateDrawType() { return this._animation.drawType; }
 
-    set animated( b ) { this._animation.animateGeometry =b; }
-    get animated() { return this._animation.animateGeometry; }
+    set animateSpin( b) { this._animation.spin = b; if( b ) this.animate(); }
+    get animateSpin() { return this._animation.spin; }
+
+    set animateDraw( b ) { this._animation.animateDraw =b; }
+    get animateDraw() { return this._animation.animateDraw; }
 
     setOnInputClicked( func ) {
         this._inputClickCallback = func;
@@ -189,31 +195,31 @@ export default class Viewport {
     }
 
     update() {
-        const automaton =this.automaton;
-        if( automaton === null )
+        if( this.automaton === null )
             return;
         // See if we need to update the geometry at all, criteria are:
         // - Different viewmode
         // - More cells 
         // - Different mode
+        // - Pivoit position
         if( this._viewmode !== this._model.viewmode 
             || this.automaton.opts.mode !== this._model.mode
-            || this.automaton.nodeCount != this._model.node_count ) {
+            || this.automaton.nodeCount !== this._model.node_count 
+            || (!this.automaton.opts.foldToRight) !== this._model.right ) {
             console.log( 'Viewport: rebuilding geometry' );
-            let populate = !this._animation.animateGeometry;
+            let populate = !this._animation.animateDraw;
             this._updateGeometry( populate );
         }
         else {
-            if( !this._animation.animateGeometry )
+            if( !this._animation.animateDraw )
                 this._updateCells();
         }
-        if( this._animation.animateGeometry ) {
+        if( this._animation.animateDraw ) {
             this._updateCells( true );
-            this._animation.node = automaton.first(); this._animation.row =0;
-            this._animation.done = false;
-            this.animate();
+            this._animation.node = this.automaton.first(); this._animation.row =0;
+            this._animation.drawDone = false;
         }
-        this.render();
+        this.animate();
     }
     
     //
@@ -357,17 +363,17 @@ export default class Viewport {
         if( automaton === null )
             return;
 
-        if( this._animation.type === 'ordered' ) {
+        if( this._animation.drawType === 'ordered' ) {
             let node = this._animation.node;
             let color = this._nodeColor( node );
             let offset = this._calcNodeOffset( node );
 
             this._setColor( offset, color );
             if( equals( node, automaton.last() ) )
-                this._animation.done =true;
+                this._animation.drawDone =true;
             else
                 this._animation.node = automaton.next( node );
-        } else if( this._animation.type === 'rows' ) {
+        } else if( this._animation.drawType === 'rows' ) {
             let row = this._animation.row;
             for( let j =0; j < automaton.rowLength(row); j++ ) {
                 let node = { col: j, row: row };
@@ -376,7 +382,7 @@ export default class Viewport {
                 this._setColor( offset, color );
             }
             if( row+1 === automaton.rows )
-                this._animation.done =true;
+                this._animation.drawDone =true;
             else
                 this._animation.row++;
         }
@@ -394,7 +400,6 @@ export default class Viewport {
         if( automaton === null )
             return;
         const viewmode =this._viewmode;
-        const right = !automaton.opts.foldToRight; // Position of the pivot
 
         // Cleanup from previous calls
         //
@@ -424,17 +429,30 @@ export default class Viewport {
             material = new THREE.MeshBasicMaterial( {side: THREE.DoubleSide, vertexColors: THREE.VertexColors} );
             if( viewmode === 'brick' ) {
                 template = new THREE.PlaneBufferGeometry( 1, 1 );
+                template = template.toNonIndexed();
             } 
             else if ( viewmode === 'diamond' ) {
                 template = new THREE.PlaneBufferGeometry( 1, 1 );
                 template.rotateZ( Math.PI * 0.25 );
                 template.scale( 1 / diamondWidth, 1 , 1 );
+                template = template.toNonIndexed();
             } 
             else if( viewmode === 'circle' ) {
                 template = new THREE.CircleBufferGeometry( 0.5, 32 );
+                template = template.toNonIndexed();
+            } else if( viewmode === 'stack' ) {
+                template = new THREE.BufferGeometry();
+                let positions = new Float32Array( [
+                        Math.cos( 2/3 * Math.PI ), 0.0, Math.sin( 2/3 * Math.PI ),
+                        Math.cos( 4/3 * Math.PI ), 0.0, Math.sin( 4/3 * Math.PI ),
+                        Math.cos( 0 ), 0.0, Math.sin( 0 ) ] );
+       /*         let normals = new Float32Array( [
+                        0.0, 0.0, 1.0,
+                        0.0, 0.0, 1.0,
+                        0.0, 0.0, 1.0 ] );*/
+                template.addAttribute( 'position', new THREE.BufferAttribute( positions, 3 ) );
             }
 
-            template = template.toNonIndexed();
             M.template_size = template.getAttribute( 'position' ).array.length; 
         }
         else {
@@ -454,10 +472,13 @@ export default class Viewport {
         M.buf_normal = new Int16Array( array_size );
         M.offset =0;
         M.node_count = automaton.nodeCount;
+        M.right = !automaton.opts.foldToRight; // Position of the pivot
 
         let addInstance = function( color, translate ) {
             let positions = template.getAttribute( 'position' ).array;
-            let normals = template.getAttribute( 'normal' ).array;
+            let normals = null;
+            if( viewmode === 'folded' )
+                normals = template.getAttribute( 'normal' ).array;
             for( let i =0; i < M.template_size; i+=3 ) {
                 M.buf_position[M.offset+i] = positions[i] + translate.x;
                 M.buf_position[M.offset+i+1] = positions[i+1] + translate.y;
@@ -467,34 +488,39 @@ export default class Viewport {
                 M.buf_color[M.offset+i+1] = color.g * 255;
                 M.buf_color[M.offset+i+2] = color.b * 255;
                 
-                M.buf_normal[M.offset+i] = normals[i] * 32767;
-                M.buf_normal[M.offset+i+1] = normals[i+1] * 32767;
-                M.buf_normal[M.offset+i+2] = normals[i+2] * 32767;
+                if( viewmode === 'folded' ) {
+                    M.buf_normal[M.offset+i] = normals[i] * 32767;
+                    M.buf_normal[M.offset+i+1] = normals[i+1] * 32767;
+                    M.buf_normal[M.offset+i+2] = normals[i+2] * 32767;
+                }
             }
             M.offset += positions.length;
         };
 
-        let foldedPosition = function( row, col, width, inputLength, right, mode ) {
-            let p = new THREE.Vector3( 0, 0, 0 );
+        let foldedPosition = function( row, col, width, inputLength, right, mode, noY =false ) {
             // The pivot position determines where the rows start
-            let coneCol = right ? (width-1) - col : col;
+            //let coneCol = right ? (width-1) - col : col;
             // Map the `triangle row' onto the `diagonal row'
-            let coneRow = row + coneCol;
+            //let coneRow = row + coneCol;
+            let coneRow = right ? row + (width-1) - col : row + col;
+            let coneCol = right ? row : coneRow - col;
             let fold =!(coneRow < inputLength);
-            let coneRowWidth = coneRow + (fold ? 0 : 1);
+            let coneRowWidth = coneRow + (fold ? 0 : 1); // FIXME: support for mode > 2
 
             // Calculate the position of the node on the `cone'
-            let offset = 0;//(coneRow%2 === 0) ? 0.125 : -0.125;
-            let phi = (coneCol+offset) * (2 * Math.PI / (coneRowWidth));
-            let radius = coneRowWidth / Math.PI;
+            let calcPosition = function( offset ) {
+                let p = new THREE.Vector3( 0, 0, 0 );
+                let phi = (coneCol+offset) * (2 * Math.PI / (coneRowWidth));
+                let fold_offset = (coneCol+offset) / coneRowWidth;
+                let radius = (coneRowWidth + fold_offset) / Math.PI;
 
-            p.x = Math.cos( phi ) * radius;
-            p.z = Math.sin( phi ) * radius;
+                p.x = Math.cos( phi ) * radius;
+                p.z = Math.sin( phi ) * radius;
 
-            let yoffset = 2 * coneCol / coneRowWidth;
-            p.y = -coneRow*2 + (fold ? yoffset : 0);
-
-            return p;
+                p.y = -coneRow*2 - ((fold && !noY) ? 2 * fold_offset : 0);
+                return p;
+            }
+            return new Array( calcPosition( 0 ), calcPosition( 1 ) );
         }
 
         let heightstep = 1.0;
@@ -513,9 +539,30 @@ export default class Viewport {
             for( let j =0; j < automaton.rowLength(i); j++ ) {
                 position.x = -automaton.width / 2 + 0.5 * i + j; 
                 
-                let color =populate ? this._nodeColor( {row: i, col: i} ) : new THREE.Color( this.backgroundColor );
+                let color =populate ? this._nodeColor( {row: i, col: j} ) : new THREE.Color( this.backgroundColor );
                 
-                if( viewmode !== 'folded' ) {
+                if( viewmode === 'folded' ) {
+                    let p = foldedPosition( i, j, automaton.rowLength(i), automaton.opts.input.length, M.right, automaton.opts.mode, false )[0];
+                    p.y += automaton.width;
+                    addInstance( color, p );
+                }
+                else if( viewmode === 'stack' ) {
+                    let ps = foldedPosition( i, j, automaton.rowLength(i), automaton.opts.input.length, M.right, automaton.opts.mode, true );
+                    // swap y and z
+                    let t = ps[0].y;
+                    ps[0].y = ps[0].z;
+                    ps[0].z = t;
+                    t = ps[1].y;
+                    ps[1].y = ps[1].z;
+                    ps[1].z = t;
+                    // Use these positions to place the triangle
+                    let tri = template.getAttribute( 'position' ).array;
+                    tri[0] = 0.0;       tri[1] = 0.0;     tri[2] = ps[0].z;  // x y z
+                    tri[3] = ps[0].x;   tri[4] = ps[0].y; tri[5] = ps[0].z;  // x y z
+                    tri[6] = ps[1].x;   tri[7] = ps[1].y; tri[8] = ps[1].z;  // x y z
+                    addInstance( color, new THREE.Vector3( 0,0,0 )  );
+                }
+                else {
                     // Add an instance to the main geometry
                     addInstance( color, position );
 
@@ -532,22 +579,19 @@ export default class Viewport {
                         M.input_pickers.push( picker_mesh );
                     }
                 }
-                else {
-                    let p = foldedPosition( i, j, automaton.rowLength(i), automaton.opts.input.length, right, automaton.opts.mode );
-                    addInstance( color, p );
-                }
-
             }
             position.y -= heightstep;
         }
         M.attr_position =new THREE.BufferAttribute(M.buf_position, 3 );
-        M.attr_normal   =new THREE.BufferAttribute(M.buf_normal, 3 );
         M.attr_color    =new THREE.BufferAttribute(M.buf_color, 3 );
         M.attr_color.normalized = true;
-        M.attr_normal.normalized = true;
         M.geometry.addAttribute('position', M.attr_position );
-        M.geometry.addAttribute('normal', M.attr_normal );
         M.geometry.addAttribute('color', M.attr_color ) ;
+        if( viewmode === 'folded' ) {
+            M.attr_normal   =new THREE.BufferAttribute(M.buf_normal, 3 );
+            M.attr_normal.normalized = true;
+            M.geometry.addAttribute('normal', M.attr_normal );
+        }
         M.geometry.computeBoundingSphere();
 
         M.mesh = new THREE.Mesh( M.geometry, material );
@@ -556,7 +600,13 @@ export default class Viewport {
         M.viewmode = viewmode;
         M.mode = automaton.opts.mode;
 
-        this._sceneHeight = automaton.width * 1.1;
+        if( viewmode === 'folded' )
+            this._sceneHeight = automaton.width * 2;
+        else if( viewmode === 'stack' )
+            this._sceneHeight = automaton.width * 0.8;
+        else
+            this._sceneHeight = automaton.width * 1.1;
+        
         this.updateCamera();
 
     }
