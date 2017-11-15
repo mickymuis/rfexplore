@@ -2,6 +2,7 @@ import Automaton from "./automaton.js";
 import Viewport from "./viewport.js";
 import Menubar from "./menubar.js";
 import equals from "./value_equals.js";
+import Texteditor from "./texteditor.js";
 
 class UIController {
     constructor( viewport ) {
@@ -153,6 +154,13 @@ class UIController {
     get inputSize()     { return this._opts.input.length; }
     set inputSize(i)    { }
 
+    editJSON() {
+        let editor = new Texteditor();
+        editor.create();
+        editor.text = JSON.stringify( this._opts );
+        editor.onDone = (json)=>{ this._opts = JSON.parse( json ); this.update(); };
+    }
+
     _emit( event, data ) {
         let listeners = this._listeners[event];
         if( typeof listeners === 'undefined' )
@@ -232,6 +240,7 @@ class App {
         f_a.add( this.controller, 'folds', 0, 500 ).name( '#Folds' ).step(1).listen();
         f_a.add( this.controller, 'foldToRight', { Left: false, Right: true } ).name( 'Fold' );
         f_a.add( this.controller, 'inputSize').name( 'Input size' ).step(1).listen();
+        f_a.add( this.controller, 'editJSON').name( 'Edit/Import/Export' );
         f_a.open();
 
         // Visualisation toolbox

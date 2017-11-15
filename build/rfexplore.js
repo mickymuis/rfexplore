@@ -93,6 +93,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	var _value_equals2 = _interopRequireDefault(_value_equals);
 	
+	var _texteditor = __webpack_require__(6);
+	
+	var _texteditor2 = _interopRequireDefault(_texteditor);
+	
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 	
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -211,6 +215,17 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	    // Properties
 	
+	
+	    UIController.prototype.editJSON = function editJSON() {
+	        var _this2 = this;
+	
+	        var editor = new _texteditor2.default();
+	        editor.create();
+	        editor.text = JSON.stringify(this._opts);
+	        editor.onDone = function (json) {
+	            _this2._opts = JSON.parse(json);_this2.update();
+	        };
+	    };
 	
 	    UIController.prototype._emit = function _emit(event, data) {
 	        var listeners = this._listeners[event];
@@ -374,7 +389,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	
 	    App.prototype.setupMenubar = function setupMenubar() {
-	        var _this2 = this;
+	        var _this3 = this;
 	
 	        // Make a menubar 
 	        this.menubar = new _menubar2.default(this.container);
@@ -385,14 +400,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var step_ctrls = this.menubar.addGroup().floatCenter();
 	        var rule_label = null;
 	        step_ctrls.addButton('', 'fa fa-backward').action(function () {
-	            _this2.controller.previousRule();
+	            _this3.controller.previousRule();
 	        });
 	        rule_label = step_ctrls.addLink('Rule #' + this.controller.rule);
 	        this.controller.on('rule', function (r) {
 	            rule_label.text = 'Rule #' + r;
 	        });
 	        step_ctrls.addButton('', 'fa fa-forward').action(function () {
-	            _this2.controller.nextRule();
+	            _this3.controller.nextRule();
 	        });
 	
 	        var r_ctrls = this.menubar.addGroup().floatRight();
@@ -400,16 +415,16 @@ return /******/ (function(modules) { // webpackBootstrap
 	            screenfull.toggle();
 	        });
 	        r_ctrls.addButton('', 'fa fa-step-forward').action(function () {
-	            _this2.controller.step();
+	            _this3.controller.step();
 	        });
 	        r_ctrls.addButton('Render', 'fa fa-camera-retro').action(function () {
-	            _this2.controller.render();
+	            _this3.controller.render();
 	        });
 	        r_ctrls.addLink('', 'fa fa-circle-o');
 	    };
 	
 	    App.prototype.setupToolbox = function setupToolbox() {
-	        var _this3 = this;
+	        var _this4 = this;
 	
 	        this.toolbox = new dat.GUI();
 	
@@ -427,6 +442,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        f_a.add(this.controller, 'folds', 0, 500).name('#Folds').step(1).listen();
 	        f_a.add(this.controller, 'foldToRight', { Left: false, Right: true }).name('Fold');
 	        f_a.add(this.controller, 'inputSize').name('Input size').step(1).listen();
+	        f_a.add(this.controller, 'editJSON').name('Edit/Import/Export');
 	        f_a.open();
 	
 	        // Visualisation toolbox
@@ -437,7 +453,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        // Colors toolbox
 	        var f_c = this.toolbox.addFolder('Colors');
 	        f_c.addColor(this.controller, 'color0').name('0').onFinishChange(function () {
-	            _this3.controller.update();
+	            _this4.controller.update();
 	        });
 	        f_c.addColor(this.controller, 'color1').name('1');
 	        f_c.addColor(this.controller, 'color2').name('2');
@@ -1871,6 +1887,124 @@ return /******/ (function(modules) { // webpackBootstrap
 	}();
 	
 	exports.default = Menubar;
+	module.exports = exports['default'];
+
+/***/ },
+/* 6 */
+/***/ function(module, exports) {
+
+	'use strict';
+	
+	exports.__esModule = true;
+	
+	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+	
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+	
+	var Texteditor = function () {
+	    function Texteditor() {
+	        _classCallCheck(this, Texteditor);
+	
+	        this._accepted = false;
+	        this._backdropElem = null;
+	        this._containerElem = null;
+	        this._textareaElem = null;
+	        this._doneFunc = null;
+	        this._cancelFunc = null;
+	    }
+	
+	    Texteditor.prototype.create = function create() {
+	        var _this = this;
+	
+	        var modal = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : true;
+	
+	        // Create a backdrop if we should block all other elements
+	        if (modal) {
+	            this._backdropElem = document.createElement('div');
+	            this._backdropElem.className = 'texteditor-backdrop';
+	            document.body.appendChild(this._backdropElem);
+	        }
+	
+	        // Set-up the editor
+	        this._containerElem = document.createElement('div');
+	        this._containerElem.className = 'texteditor-container';
+	        document.body.appendChild(this._containerElem);
+	
+	        var wrapper = document.createElement('div');
+	        wrapper.className = 'wrapper';
+	        this._containerElem.appendChild(wrapper);
+	
+	        this._textareaElem = document.createElement('textarea');
+	        wrapper.appendChild(this._textareaElem);
+	
+	        var bttnCancel = document.createElement('button');
+	        bttnCancel.className = 'cancel';
+	        bttnCancel.appendChild(document.createTextNode('Cancel'));
+	        this._containerElem.appendChild(bttnCancel);
+	        bttnCancel.addEventListener('click', function () {
+	            _this._onCancel();
+	        });
+	
+	        var bttnDone = document.createElement('button');
+	        bttnDone.className = 'done';
+	        bttnDone.appendChild(document.createTextNode('Done'));
+	        this._containerElem.appendChild(bttnDone);
+	        bttnDone.addEventListener('click', function () {
+	            _this._onDone();
+	        });
+	    };
+	
+	    Texteditor.prototype.remove = function remove() {
+	        if (this._backdropElem) document.body.removeChild(this._backdropElem);
+	
+	        document.body.removeChild(this._containerElem);
+	    };
+	
+	    Texteditor.prototype._onDone = function _onDone() {
+	        this.remove();
+	        if (typeof this._doneFunc === 'function') this._doneFunc(this.text);
+	    };
+	
+	    Texteditor.prototype._onCancel = function _onCancel() {
+	        this.remove();
+	        if (typeof this._cancelFunc === 'function') this._cancelFunc();
+	    };
+	
+	    _createClass(Texteditor, [{
+	        key: 'text',
+	        set: function set(str) {
+	            this._textareaElem.value = str;
+	        },
+	        get: function get() {
+	            return this._textareaElem.value;
+	        }
+	    }, {
+	        key: 'onDone',
+	        set: function set(func) {
+	            this._doneFunc = func;
+	        },
+	        get: function get() {
+	            return this._doneFunc;
+	        }
+	    }, {
+	        key: 'onCancel',
+	        set: function set(func) {
+	            this._cancelFunc = func;
+	        },
+	        get: function get() {
+	            return this._cancelFunc;
+	        }
+	    }, {
+	        key: 'accepted',
+	        get: function get() {
+	            return this._accepted;
+	        }
+	    }]);
+	
+	    return Texteditor;
+	}();
+	
+	exports.default = Texteditor;
 	module.exports = exports['default'];
 
 /***/ }

@@ -36,7 +36,7 @@ margin: 0; padding: 0;
     color: #555;
     font: 11px 'Lucida Grande', sans-serif;
     box-sizing: border-box;
-    z-index: 99;
+    z-index: 10;
 }
 
 .menubar .panel {
@@ -120,4 +120,51 @@ margin: 0; padding: 0;
 .menubar i.text-right {
     margin: 0 4px 0 0;
 }
+
+/* Styles for texteditor */
+
+.texteditor-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #777777;
+    opacity: 0.5;
+    z-index: 20;
+}
+
+.texteditor-container {
+    position: absolute;
+    top: 0; bottom: 0;
+    left: 0; right: 0;
+    margin: auto;
+    width: 60%;
+    height: 60%;
+    padding: 15px;
+    background-color: #e8e8e8;
+    z-index: 21;
+}
+
+.texteditor-container .wrapper {
+    width: 100%;
+    height: calc( 100% - 45px );
+}
+
+.texteditor-container textarea {
+    width: 100%;
+    height: 100%;
+    resize: none;
+    clear: both;
+}
+
+.texteditor-container button.cancel {
+    height: 30px;
+    float: left;
+}
+
+.texteditor-container button.done {
+    height: 30px;
+    float: right;
+
 
