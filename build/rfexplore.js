@@ -105,8 +105,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	        this.viewport = viewport;
 	        this.autoUpdate = true;
-	        this._viewmode = 'stack';
-	        this._folded = false;
+	        this._viewmode = 'circle';
 	        this._palette = ['#ff5511', '#33ffcc', '#ffaa33', '#5E69FF'];
 	        this._automaton = null;
 	        this._oldopts = null;
@@ -150,9 +149,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	            change = true;
 	        } else console.log('not changed');
 	
-	        var viewmode = this._folded ? 'folded' : this._viewmode;
-	        if (viewmode != this.viewport.viewmode) {
-	            this.viewport.viewmode = viewmode;
+	        if (this._viewmode != this.viewport.viewmode) {
+	            this.viewport.viewmode = this._viewmode;
 	            change = true;
 	        }
 	
@@ -296,14 +294,6 @@ return /******/ (function(modules) { // webpackBootstrap
 	            this.update();
 	        }
 	    }, {
-	        key: "folded",
-	        get: function get() {
-	            return this._folded;
-	        },
-	        set: function set(b) {
-	            this._folded = b == 'true' || b == true;this.update();
-	        }
-	    }, {
 	        key: "folds",
 	        get: function get() {
 	            return this._opts.folds;
@@ -406,7 +396,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	        });
 	
 	        var r_ctrls = this.menubar.addGroup().floatRight();
-	        r_ctrls.addButton('', 'fa fa-arrows-alt');
+	        r_ctrls.addButton('', 'fa fa-arrows-alt').action(function () {
+	            screenfull.toggle();
+	        });
 	        r_ctrls.addButton('', 'fa fa-step-forward').action(function () {
 	            _this2.controller.step();
 	        });
@@ -439,8 +431,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	        // Visualisation toolbox
 	        var f_v = this.toolbox.addFolder('Visualisation');
-	        f_v.add(this.controller, 'viewmode', { Brick: 'brick', Diamond: 'diamond', Circle: 'circle', Stack: 'stack' }).name('Cell shape');
-	        f_v.add(this.controller, 'folded').name('Folded');
+	        f_v.add(this.controller, 'viewmode', { Brick: 'brick', Diamond: 'diamond', Circle: 'circle', Stack: 'stack', Folded: 'folded' }).name('Cell shape');
 	        f_v.open();
 	
 	        // Colors toolbox
@@ -451,6 +442,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        f_c.addColor(this.controller, 'color1').name('1');
 	        f_c.addColor(this.controller, 'color2').name('2');
 	        f_c.addColor(this.controller, 'color3').name('3');
+	        f_c.addColor(this.viewport, 'backgroundColor').name('Background');
 	        //f_c.open();
 	
 	        // Render toolbox
@@ -837,7 +829,6 @@ return /******/ (function(modules) { // webpackBootstrap
 	        _classCallCheck(this, Viewport);
 	
 	        this.container = elem;
-	        this.backgroundColor = '#999999';
 	
 	        this.automaton = null;
 	        // fixme: remove
@@ -847,6 +838,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this.viewportHeight = this.container.offsetHeight;
 	
 	        this._viewmode = 'folded'; // one of 'brick', 'diamond', 'circle', 'folded'
+	        this._backgroundColor = '#777777';
 	        this._scene = null;
 	        this._aspect = 1.0;
 	        this._cameraPersp = null;
@@ -1005,7 +997,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        // - Different viewmode
 	        // - More cells 
 	        // - Different mode
-	        // - Pivoit position
+	        // - Pivot position
 	        if (this._viewmode !== this._model.viewmode || this.automaton.opts.mode !== this._model.mode || this.automaton.nodeCount !== this._model.node_count || !this.automaton.opts.foldToRight !== this._model.right) {
 	            console.log('Viewport: rebuilding geometry');
 	            var populate = !this._animation.animateDraw;
@@ -1436,6 +1428,16 @@ return /******/ (function(modules) { // webpackBootstrap
 	        },
 	        get: function get() {
 	            return this._animation.animateDraw;
+	        }
+	    }, {
+	        key: "backgroundColor",
+	        set: function set(str) {
+	            this._backgroundColor = str;
+	            this._scene.background = new THREE.Color(this.backgroundColor);
+	            this.render();
+	        },
+	        get: function get() {
+	            return this._backgroundColor;
 	        }
 	    }]);
 	

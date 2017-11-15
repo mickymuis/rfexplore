@@ -7,8 +7,7 @@ class UIController {
     constructor( viewport ) {
         this.viewport =viewport;
         this.autoUpdate =true;
-        this._viewmode ='stack';
-        this._folded =false;
+        this._viewmode ='circle';
         this._palette = [ '#ff5511', '#33ffcc', '#ffaa33', '#5E69FF' ]; 
         this._automaton =null;
         this._oldopts = null;
@@ -52,9 +51,8 @@ class UIController {
         }
         else console.log( 'not changed' );
 
-        let viewmode = this._folded ? 'folded' : this._viewmode;
-        if( viewmode != this.viewport.viewmode ) {
-            this.viewport.viewmode = viewmode;
+        if( this._viewmode != this.viewport.viewmode ) {
+            this.viewport.viewmode = this._viewmode;
             change =true;
         }
         
@@ -139,8 +137,6 @@ class UIController {
         this._emit( 'maxrules', Automaton.maxRules( i, this._opts.mode ) ); 
         this.update(); 
     }
-    get folded()        { return this._folded; }
-    set folded(b)       { this._folded =(b == 'true' || b == true); this.update(); }
     get folds()         { return this._opts.folds; }
     set folds(i)        { this._opts.folds =i; this._emit( 'folds', i ); this.update(); }
     get foldToRight()   { return this._opts.foldToRight; }
@@ -217,7 +213,7 @@ class App {
         step_ctrls.addButton( '', 'fa fa-forward' ).action( ()=> { this.controller.nextRule(); } );
 
         let r_ctrls = this.menubar.addGroup().floatRight();
-        r_ctrls.addButton( '', 'fa fa-arrows-alt' );
+        r_ctrls.addButton( '', 'fa fa-arrows-alt' ).action( ()=>{ screenfull.toggle(); } );
         r_ctrls.addButton( '', 'fa fa-step-forward' ).action( ()=>{ this.controller.step(); } );
         r_ctrls.addButton( 'Render', 'fa fa-camera-retro' ).action( ()=>{ this.controller.render(); } );
         r_ctrls.addLink( '', 'fa fa-circle-o' );
@@ -240,8 +236,7 @@ class App {
 
         // Visualisation toolbox
         let f_v = this.toolbox.addFolder( 'Visualisation' );
-        f_v.add( this.controller, 'viewmode', { Brick : 'brick', Diamond: 'diamond', Circle: 'circle', Stack: 'stack' } ).name( 'Cell shape' );
-        f_v.add( this.controller, 'folded' ).name( 'Folded' );
+        f_v.add( this.controller, 'viewmode', { Brick : 'brick', Diamond: 'diamond', Circle: 'circle', Stack: 'stack', Folded: 'folded' } ).name( 'Cell shape' );
         f_v.open();
 
         // Colors toolbox
@@ -250,6 +245,7 @@ class App {
         f_c.addColor( this.controller, 'color1' ).name( '1' );
         f_c.addColor( this.controller, 'color2' ).name( '2' );
         f_c.addColor( this.controller, 'color3' ).name( '3' );
+        f_c.addColor( this.viewport, 'backgroundColor' ).name( 'Background' );
         //f_c.open();
 
         // Render toolbox

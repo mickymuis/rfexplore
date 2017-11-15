@@ -8,7 +8,6 @@ export default class Viewport {
     constructor( elem ) {
 
         this.container =elem;
-        this.backgroundColor = '#999999'
         
         this.automaton = null;
         // fixme: remove
@@ -18,6 +17,7 @@ export default class Viewport {
         this.viewportHeight = this.container.offsetHeight;
 
         this._viewmode = 'folded'; // one of 'brick', 'diamond', 'circle', 'folded'
+        this._backgroundColor = '#777777'
         this._scene = null;
         this._aspect =1.0;
         this._cameraPersp = null;
@@ -172,11 +172,18 @@ export default class Viewport {
     set animateDrawType( t ) { this._animation.drawType = t;  }
     get animateDrawType() { return this._animation.drawType; }
 
-    set animateSpin( b) { this._animation.spin = b; if( b ) this.animate(); }
+    set animateSpin( b ) { this._animation.spin = b; if( b ) this.animate(); }
     get animateSpin() { return this._animation.spin; }
 
     set animateDraw( b ) { this._animation.animateDraw =b; }
     get animateDraw() { return this._animation.animateDraw; }
+    
+    set backgroundColor( str ) {
+        this._backgroundColor = str;
+        this._scene.background = new THREE.Color( this.backgroundColor );
+        this.render();
+    }
+    get backgroundColor() { return this._backgroundColor; }
 
     setOnInputClicked( func ) {
         this._inputClickCallback = func;
@@ -201,7 +208,7 @@ export default class Viewport {
         // - Different viewmode
         // - More cells 
         // - Different mode
-        // - Pivoit position
+        // - Pivot position
         if( this._viewmode !== this._model.viewmode 
             || this.automaton.opts.mode !== this._model.mode
             || this.automaton.nodeCount !== this._model.node_count 
