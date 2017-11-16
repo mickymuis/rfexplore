@@ -15,9 +15,9 @@ class UIController {
         this._opts = { // Options to Automaton constructor
             mode: 2,
             base: 2,
-            folds: 0,
+            folds: 20,
             rule: 6,
-            input: [ 0, 1, 1, 0, 0, 1, 0 ],
+            input: [ 1, 1, 0, 0, 0, 0, 0, 0 ],
             foldToRight: false
         }; 
         this._listeners = {
