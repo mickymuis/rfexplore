@@ -37,8 +37,8 @@ export default class Automaton {
         this._curPos = this._rows[0].length -1;
         this._folds  = 0;
        
-        this.maxRules =0;
-        this.ttable = this.makeTTable( base, mode, rule );
+        this.maxRules =Automaton.maxRules( base, mode );
+        this.ttable = Automaton.makeTTable( base, mode, rule );
         this.nodeCount = this.width;
         this.inputSize = input.length;
 
@@ -68,12 +68,10 @@ export default class Automaton {
      * Generate a transition table given a base, mode and rule number
      * Returns an array
      */
-    makeTTable( base, mode, rule ) {
+    static makeTTable( base, mode, rule ) {
         var tt = new Array();
         let rulesize = Math.pow( base, mode );
-        this.maxRules = Math.pow( base, rulesize );
 
-        console.log( "Transition table for rule #" + rule + " / " + this.maxRules + " * " + rulesize );
         if( rulesize > this.maxRules ) {
             return null;
         }
@@ -88,8 +86,6 @@ export default class Automaton {
             decimal = Math.floor( decimal / base );
             i--;
         }
-        for( let i = 0; i < rulesize; i++ )
-            console.log( i + ": " + tt[i] );
         return tt;
     }
 
@@ -98,7 +94,7 @@ export default class Automaton {
      * returns the index of the transition table that contains the reduction rule
      * for A[0] .. A[mode-1] -> b
      */
-    ttIndex( base, mode, A ) {
+    static ttIndex( base, mode, A ) {
         let mult =1;
         let index =0;
         for( let i = mode-1; i >= 0; i-- ) {
@@ -162,25 +158,25 @@ export default class Automaton {
         this._curRow = nextPos.row;
         this._curPos = nextPos.col;
 
+        // Step 1. check whether a special action is required
         if( this._curRow === 0 ) {
-            //console.log( "fold" );
             // Top row, which means the next step can only be a fold
-            // Step 1. extend all rows by one
+            // Step 1b. extend all rows by one
             for( let i =0; i < this._rows.length; i++ ) {
                 // push
                 this._rows[i][this._rows[i].length] = -1;
             }
-            // Step 2. copy ('fold') the apex/singleton row over to the top row
+            // Step 1c. copy ('fold') the apex/singleton row over to the top row
             let foldValue = this._rows[this._rows.length-1][0];
             this._rows[0][this._curPos] = foldValue;
-            // Step 3. extend the automata
+            // Step 1d. extend the automata
             this._rows.push( [-1] );
             this._folds++;
             this.nodeCount += this._rows.length;
             return;
         }
         else if( typeof this._rows[this._curRow] === 'undefined' ) {
-            // We need to start a new row
+            // Step 1e. We need to start a new row
             let len = this._rows[this._curRow-1].length - 1;
             this._rows.push( new Array(len) );
             this._rows[this._curRow].fill( -1 );
@@ -191,7 +187,7 @@ export default class Automaton {
         let parents = this._rows[this._curRow-1].slice( this._curPos, this._curPos + this.opts.mode );
 
         // Step 2. Use the transition table to obtain the value for the current node
-        var value =this.ttable[this.ttIndex( this.opts.base, this.opts.mode, parents )];
+        var value =this.ttable[Automaton.ttIndex( this.opts.base, this.opts.mode, parents )];
         this._rows[this._curRow][this._curPos] = value;
 
     }
@@ -234,18 +230,27 @@ export default class Automaton {
     _next( { col, row } ) {
         let _row = this._rows[row];
         let unfoldedRowLength = this.inputSize - row * (this.opts.mode-1);
-        let lastInputRow = this.inputSize-1; // TODO fix for mode > 2
+        let lastInputRow = Math.ceil( this.inputSize / (this.opts.mode-1) )-1;
 
-        if( col < unfoldedRowLength && row < lastInputRow ) {
-            if( col === unfoldedRowLength - 1 )
-                return { col: 0, row: row + 1 };
+        if( col < unfoldedRowLength && row <= lastInputRow ) {
+            if( col === unfoldedRowLength - 1 ) {
+                if( row === lastInputRow ) 
+                    // First fold
+                    return { col: this.inputSize, row: 0 };
+                else
+                    // Next row
+                    return { col: 0, row: row + 1 };
+            }
             else
+                // Next col
                 return { col: col + 1, row: row };
         }
         else if( col === 0 ) {
+            // Fold
             return { col: this.inputSize + (row - lastInputRow), row: 0 };
         } 
 
+        // Next row within fold
         return { col: col - 1, row: row + 1 };
 
 

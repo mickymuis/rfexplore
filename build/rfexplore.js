@@ -97,6 +97,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	var _texteditor2 = _interopRequireDefault(_texteditor);
 	
+	var _ttable = __webpack_require__(7);
+	
+	var _ttable2 = _interopRequireDefault(_ttable);
+	
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 	
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -109,6 +113,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	        this.viewport = viewport;
 	        this.autoUpdate = true;
+	        this.cluster = 'ttable2'; //'none';
 	        this._viewmode = 'circle';
 	        this._palette = ['#ff5511', '#33ffcc', '#ffaa33', '#5E69FF'];
 	        this._automaton = null;
@@ -151,6 +156,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	            this._automaton.generate();
 	            this.viewport.automaton = this._automaton;
 	            change = true;
+	
+	            // Testing
+	            var tt2 = new _ttable2.default(this._opts.base, this._opts.mode, this._opts.rule);
+	            console.log(tt2.computeFeature());
 	        } else console.log('not changed');
 	
 	        if (this._viewmode != this.viewport.viewmode) {
@@ -172,11 +181,17 @@ return /******/ (function(modules) { // webpackBootstrap
 	    };
 	
 	    UIController.prototype.nextRule = function nextRule() {
-	        this.rule++;
+	        if (this.cluster === 'ttable2') {
+	            var tt2 = new _ttable2.default(this._opts.base, this._opts.mode, this._opts.rule);
+	            this.rule = tt2.findNextNN(false, 1);
+	        } else this.rule++;
 	    };
 	
 	    UIController.prototype.previousRule = function previousRule() {
-	        this.rule--;
+	        if (this.cluster === 'ttable2') {
+	            var tt2 = new _ttable2.default(this._opts.base, this._opts.mode, this._opts.rule);
+	            this.rule = tt2.findNextNN(true, 1);
+	        } else this.rule--;
 	    };
 	
 	    UIController.prototype.step = function step() {
@@ -304,6 +319,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	            return this._opts.base;
 	        },
 	        set: function set(i) {
+	            if (this._opts.base > i) this.rule = 0;
 	            this._opts.base = i;
 	            this._emit('maxrules', _automaton2.default.maxRules(i, this._opts.mode));
 	            this.update();
@@ -450,6 +466,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	        f_v.add(this.controller, 'viewmode', { Brick: 'brick', Diamond: 'diamond', Circle: 'circle', Stack: 'stack', Folded: 'folded' }).name('Cell shape');
 	        f_v.open();
 	
+	        var f_cl = this.toolbox.addFolder('Clustering');
+	        f_cl.add(this.controller, 'cluster', { None: 'none', TTable2: 'ttable2' }).name('Mode');
+	
 	        // Colors toolbox
 	        var f_c = this.toolbox.addFolder('Colors');
 	        f_c.addColor(this.controller, 'color0').name('0').onFinishChange(function () {
@@ -535,8 +554,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this._curPos = this._rows[0].length - 1;
 	        this._folds = 0;
 	
-	        this.maxRules = 0;
-	        this.ttable = this.makeTTable(base, mode, rule);
+	        this.maxRules = Automaton.maxRules(base, mode);
+	        this.ttable = Automaton.makeTTable(base, mode, rule);
 	        this.nodeCount = this.width;
 	        this.inputSize = input.length;
 	    }
@@ -561,12 +580,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	     */
 	
 	
-	    Automaton.prototype.makeTTable = function makeTTable(base, mode, rule) {
+	    Automaton.makeTTable = function makeTTable(base, mode, rule) {
 	        var tt = new Array();
 	        var rulesize = Math.pow(base, mode);
-	        this.maxRules = Math.pow(base, rulesize);
 	
-	        console.log("Transition table for rule #" + rule + " / " + this.maxRules + " * " + rulesize);
 	        if (rulesize > this.maxRules) {
 	            return null;
 	        }
@@ -580,9 +597,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	            decimal = Math.floor(decimal / base);
 	            i--;
 	        }
-	        for (var _i2 = 0; _i2 < rulesize; _i2++) {
-	            console.log(_i2 + ": " + tt[_i2]);
-	        }return tt;
+	        return tt;
 	    };
 	
 	    /*
@@ -592,7 +607,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	     */
 	
 	
-	    Automaton.prototype.ttIndex = function ttIndex(base, mode, A) {
+	    Automaton.ttIndex = function ttIndex(base, mode, A) {
 	        var mult = 1;
 	        var index = 0;
 	        for (var i = mode - 1; i >= 0; i--) {
@@ -678,24 +693,24 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this._curRow = nextPos.row;
 	        this._curPos = nextPos.col;
 	
+	        // Step 1. check whether a special action is required
 	        if (this._curRow === 0) {
-	            //console.log( "fold" );
 	            // Top row, which means the next step can only be a fold
-	            // Step 1. extend all rows by one
+	            // Step 1b. extend all rows by one
 	            for (var i = 0; i < this._rows.length; i++) {
 	                // push
 	                this._rows[i][this._rows[i].length] = -1;
 	            }
-	            // Step 2. copy ('fold') the apex/singleton row over to the top row
+	            // Step 1c. copy ('fold') the apex/singleton row over to the top row
 	            var foldValue = this._rows[this._rows.length - 1][0];
 	            this._rows[0][this._curPos] = foldValue;
-	            // Step 3. extend the automata
+	            // Step 1d. extend the automata
 	            this._rows.push([-1]);
 	            this._folds++;
 	            this.nodeCount += this._rows.length;
 	            return;
 	        } else if (typeof this._rows[this._curRow] === 'undefined') {
-	            // We need to start a new row
+	            // Step 1e. We need to start a new row
 	            var len = this._rows[this._curRow - 1].length - 1;
 	            this._rows.push(new Array(len));
 	            this._rows[this._curRow].fill(-1);
@@ -706,7 +721,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var parents = this._rows[this._curRow - 1].slice(this._curPos, this._curPos + this.opts.mode);
 	
 	        // Step 2. Use the transition table to obtain the value for the current node
-	        var value = this.ttable[this.ttIndex(this.opts.base, this.opts.mode, parents)];
+	        var value = this.ttable[Automaton.ttIndex(this.opts.base, this.opts.mode, parents)];
 	        this._rows[this._curRow][this._curPos] = value;
 	    };
 	
@@ -754,14 +769,24 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	        var _row = this._rows[row];
 	        var unfoldedRowLength = this.inputSize - row * (this.opts.mode - 1);
-	        var lastInputRow = this.inputSize - 1; // TODO fix for mode > 2
+	        var lastInputRow = Math.ceil(this.inputSize / (this.opts.mode - 1)) - 1;
 	
-	        if (col < unfoldedRowLength && row < lastInputRow) {
-	            if (col === unfoldedRowLength - 1) return { col: 0, row: row + 1 };else return { col: col + 1, row: row };
+	        if (col < unfoldedRowLength && row <= lastInputRow) {
+	            if (col === unfoldedRowLength - 1) {
+	                if (row === lastInputRow)
+	                    // First fold
+	                    return { col: this.inputSize, row: 0 };else
+	                    // Next row
+	                    return { col: 0, row: row + 1 };
+	            } else
+	                // Next col
+	                return { col: col + 1, row: row };
 	        } else if (col === 0) {
+	            // Fold
 	            return { col: this.inputSize + (row - lastInputRow), row: 0 };
 	        }
 	
+	        // Next row within fold
 	        return { col: col - 1, row: row + 1 };
 	
 	        /* // Case 1: we're the apex, return to the top row
@@ -2006,6 +2031,170 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	exports.default = Texteditor;
 	module.exports = exports['default'];
+
+/***/ },
+/* 7 */
+/***/ function(module, exports, __webpack_require__) {
+
+	"use strict";
+	
+	exports.__esModule = true;
+	
+	var _automaton = __webpack_require__(2);
+	
+	var _automaton2 = _interopRequireDefault(_automaton);
+	
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+	
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+	
+	/* Given an array containing the digits of a number with a given base,
+	 * increment this number by one
+	 */
+	var varbase_incr = function varbase_incr(A, base) {
+	    for (var i = A.length - 1; i >= 0; i--) {
+	        if (++A[i] < base) break;else A[i] = 0;
+	    }
+	};
+	
+	/*
+	 * Provides a second level transition table with support for feature extraction
+	 */
+	
+	var TTable2 = function () {
+	    function TTable2(base, mode, rule) {
+	        _classCallCheck(this, TTable2);
+	
+	        // Generate the level1 ttable
+	        this.level1 = _automaton2.default.makeTTable(base, mode, rule);
+	
+	        // Size of the level2 ttable is |tt|^2
+	        this.size = this.level1.length * this.level1.length;
+	
+	        // Buffer to hold the input pattern as we increment it
+	        var A = new Array(mode * mode);
+	        A.fill(0);
+	
+	        this.entry = new Array(this.size);
+	        for (var i = 0; i < this.size; i++) {
+	            var input = A.slice(0, A.length);
+	            var output = new Array(mode);
+	            for (var j = 0; j < mode; j++) {
+	                var n = _automaton2.default.ttIndex(base, mode, A.slice(j * mode, j * mode + mode));
+	                output[j] = this.level1[n];
+	            }
+	            this.entry[i] = { input: input, output: output };
+	
+	            varbase_incr(A, base);
+	        }
+	
+	        this.mode = mode;
+	        this.base = base;
+	        this.rule = rule;
+	    }
+	    /*
+	     * Compute the feature vector of this transition table
+	     */
+	
+	
+	    TTable2.prototype.computeFeature = function computeFeature() {
+	        // We categorize the level2 transitions based on these semantics
+	        var invert = 0;
+	        var join = 0;
+	        var select = 0;
+	        var combine = 0;
+	        var other = 0;
+	
+	        for (var i = 0; i < this.size; i++) {
+	            var input = this.entry[i].input;
+	            var output = this.entry[i].output;
+	            //console.log( input + " -> " + output );
+	            if (i === 0 || i === this.size - 1) {
+	                if (input[0] == output[0]) join++;else invert++;
+	            } else if (this._isSelect(input, output)) {
+	                select++;
+	            } else if (this._isCombine(input, output)) {
+	                combine++;
+	            } else other++;
+	        }
+	        return [invert, join, select, combine, other];
+	    };
+	
+	    /*
+	     * Compute the Euclidian distance between two feature vectors
+	     */
+	
+	
+	    TTable2.distance = function distance(v1, v2) {
+	        var diff = 0;
+	        for (var i = 0; i < v1.length; i++) {
+	            diff += Math.pow(Math.abs(v1[i] - v2[i]), 2);
+	        }
+	        return Math.sqrt(diff);
+	    };
+	
+	    /*
+	     * Find the next nearest neighbor within the same cluster
+	     * Starts in forward direction (if backwards=false)
+	     * Resulting next rule has a distance <= maxDist
+	     */
+	
+	
+	    TTable2.prototype.findNextNN = function findNextNN() {
+	        var backwards = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
+	        var maxDist = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+	
+	        var v1 = this.computeFeature();
+	        var rule = this.rule;
+	        var maxRules = _automaton2.default.maxRules(this.base, this.mode);
+	
+	        do {
+	            if (backwards) rule--;else rule++;
+	
+	            var tt2 = new TTable2(this.base, this.mode, rule);
+	            var v2 = tt2.computeFeature();
+	            if (TTable2.distance(v1, v2) <= maxDist) return rule;
+	        } while (rule >= 0 && rule < maxRules);
+	
+	        return rule;
+	    };
+	
+	    TTable2.prototype._isSelect = function _isSelect(input, output) {
+	        for (var i = 0; i < this.mode; i++) {
+	            if (this._comp(input, i * this.mode, output, 0, this.mode)) return true;
+	        }
+	        return false;
+	    };
+	
+	    TTable2.prototype._isCombine = function _isCombine(input, output) {
+	        // This works for mode == 2, a factatorial rescursive version is needed otherwise
+	        if (this.mode === 2) {
+	            return input[0] == output[0] && input[4] == output[1] || input[1] == output[1] && input[3] == output[0];
+	        }
+	        return false;
+	    };
+	
+	    TTable2.prototype._isCombineRecursive = function _isCombineRecursive(input, output, A, n) {}
+	    // TODO
+	
+	
+	    /*
+	     * Compare A[i]..A[i+N-1] to B[j]..B[j+N-1]
+	     */
+	    ;
+	
+	    TTable2.prototype._comp = function _comp(A, i, B, j, N) {
+	        for (var n = 0; n < N; n++) {
+	            if (A[i + n] != B[j + n]) return false;
+	        }
+	        return true;
+	    };
+	
+	    return TTable2;
+	}();
+	
+	exports.default = TTable2;
+	module.exports = exports["default"];
 
 /***/ }
 /******/ ])

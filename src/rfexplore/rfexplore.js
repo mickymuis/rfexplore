@@ -3,11 +3,13 @@ import Viewport from "./viewport.js";
 import Menubar from "./menubar.js";
 import equals from "./value_equals.js";
 import Texteditor from "./texteditor.js";
+import TTable2 from "./ttable.js";
 
 class UIController {
     constructor( viewport ) {
         this.viewport =viewport;
         this.autoUpdate =true;
+        this.cluster = 'none';
         this._viewmode ='circle';
         this._palette = [ '#ff5511', '#33ffcc', '#ffaa33', '#5E69FF' ]; 
         this._automaton =null;
@@ -49,6 +51,10 @@ class UIController {
             this._automaton.generate();
             this.viewport.automaton = this._automaton;
             change =true;
+
+            // Testing
+            let tt2 = new TTable2( this._opts.base, this._opts.mode, this._opts.rule );
+            console.log( tt2.computeFeature() );
         }
         else console.log( 'not changed' );
 
@@ -71,11 +77,19 @@ class UIController {
     }
 
     nextRule() {
-        this.rule++;
+        if( this.cluster === 'ttable2' ) {
+            let tt2 =new TTable2( this._opts.base, this._opts.mode, this._opts.rule );
+            this.rule =tt2.findNextNN( false, 1 );
+        } else
+            this.rule++;
     }
 
     previousRule() {
-        this.rule--;
+        if( this.cluster === 'ttable2' ) {
+            let tt2 =new TTable2( this._opts.base, this._opts.mode, this._opts.rule );
+            this.rule =tt2.findNextNN( true, 1 );
+        } else
+            this.rule--;
     }
 
     step() {
@@ -134,7 +148,9 @@ class UIController {
     }
     get base()          { return this._opts.base; }
     set base(i)         { 
-        this._opts.base =i; 
+        if( this._opts.base > i )
+            this.rule =0;
+        this._opts.base =i;
         this._emit( 'maxrules', Automaton.maxRules( i, this._opts.mode ) ); 
         this.update(); 
     }
@@ -247,6 +263,9 @@ class App {
         let f_v = this.toolbox.addFolder( 'Visualisation' );
         f_v.add( this.controller, 'viewmode', { Brick : 'brick', Diamond: 'diamond', Circle: 'circle', Stack: 'stack', Folded: 'folded' } ).name( 'Cell shape' );
         f_v.open();
+        
+        let f_cl = this.toolbox.addFolder( 'Clustering' );
+        f_cl.add( this.controller, 'cluster', { None : 'none', TTable2: 'ttable2' } ).name( 'Mode' );
 
         // Colors toolbox
         let f_c = this.toolbox.addFolder( 'Colors' );
