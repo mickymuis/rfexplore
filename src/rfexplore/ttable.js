@@ -12,6 +12,30 @@ var varbase_incr = function( A, base ) {
     }
 }
 
+var varbase_incrall = function( A, base ) {
+    for( let i =A.length-1; i >= 0; i-- ) {
+        if( (++A[i]) >= base )
+            A[i] =0;
+    }
+
+}
+
+var varbase_add = function( A, B, base ) {
+    let C = new Array( A.length );
+    for( let i =A.length-1; i >= 0; i-- ) {
+        C[i] = (A[i] + B[i]) % base;
+    }
+    return C;
+}
+
+var varbase_sub = function( A, B, base ) {
+    let C = new Array( A.length );
+    for( let i =A.length-1; i >= 0; i-- ) {
+        C[i] = Math.abs((A[i] - B[i]));
+    }
+    return C;
+}
+
 /*
  * Provides a second level transition table with support for feature extraction
  */
@@ -53,17 +77,27 @@ export default class TTable2 {
         let join =0;
         let select =0;
         let combine =0;
+        //let add =0;
+        //let substract =0;
+        let shift =0;
+        let mask =0;
         let other =0;
 
         for( let i =0; i < this.size; i++ ) {
             let input = this.entry[i].input;
             let output = this.entry[i].output;
             //console.log( input + " -> " + output );
-            if( i === 0 || i === this.size-1 ) {
+/*            if( i === 0 || i === this.size-1 ) {
                 if( input[0] == output[0] )
                     join++;
                 else
                     invert++;
+            }*/
+            if( this._isJoin( input, output ) ) {
+                join++;
+            } 
+            else if( this._isInvert( input, output ) ) {
+                invert++;
             }
             else if( this._isSelect( input, output ) ) {
                 select++;
@@ -71,10 +105,24 @@ export default class TTable2 {
             else if( this._isCombine( input, output ) ) {
                 combine++;
             }
-            else
+         /*   else if( this._isAdd( input, output ) ) {
+                add++;
+            }
+            else if( this._isSubstract( input, output ) ) {
+                substract++;
+            }*/
+            else if( this._isShift( input, output ) ) {
+                shift++;
+            }
+            else if( this._isMask( input, output ) ) {
+                mask++;
+            }
+            else {
+            //    console.log( "Unclassified: " +  input + " -> " + output );
                 other++;
+            }
         }
-        return [ invert, join, select, combine, other ];
+        return [ invert, join, select, combine, shift, mask, other ];
     }
 
     /*
@@ -111,7 +159,41 @@ export default class TTable2 {
 
         return rule;
     }
+    
+    /*
+     * Test if mn = nmnm = output
+     */
+    _isInvert( input, output ) {
+        // Step 1, compare input parts to themselves
+        for( let i =1; i < this.mode; i++ ) {
+            if( !this._comp( input, i * this.mode, input, 0, this.mode ) )
+                return false;
+        }
+        // Step 2, compare inverted portion of input to output
+        let A = input.slice( 0, this.mode );
+        for( let i =1; i < this.base; i++ ) {
+            varbase_incrall( A, this.base );
+            if( this._comp( A, 0, output, 0, this.mode ) )
+                return true;
+        }
 
+        return false;
+    }
+
+    /*
+     * Test if mn = mnmn = output
+     */
+    _isJoin( input, output ) {
+        for( let i =0; i < this.mode; i++ ) {
+            if( !this._comp( input, i * this.mode, output, 0, this.mode ) )
+                return false;
+        }
+        return true;
+    }
+
+    /*
+     * Test if mn = xxmn = output or mn = mnxx = output
+     */
     _isSelect( input, output ) {
         for( let i =0; i < this.mode; i++ ) {
             if( this._comp( input, i * this.mode, output, 0, this.mode ) )
@@ -120,17 +202,64 @@ export default class TTable2 {
         return false;
     }
 
+    /*
+     * Test if mn = mxxn = output or mn = xmnx = output
+     */
     _isCombine( input, output ) {
         // This works for mode == 2, a factatorial rescursive version is needed otherwise
         if( this.mode === 2 ) {
-            return ( input[0] == output[0] && input[4] == output[1] )
-                || ( input[1] == output[1] && input[3] == output[0] );
+            return (( input[0] == output[0] && input[3] == output[1] )
+                || ( input[1] == output[1] && input[2] == output[0] ));
         }
         return false;
     }
 
     _isCombineRecursive( input, output, A, n ) {
     // TODO
+    }
+
+    _isAdd( input, output ) {
+        let A = input.slice( 0, this.mode );
+        for( let i =1; i < this.mode; i++ ) {
+            A = varbase_add( A, input.slice( i*this.mode, i*this.mode+this.mode ), this.base );
+        }
+        if( this._comp( A, 0, output, 0, this.mode ) )
+            return true;
+        return false;    
+    }
+    
+    _isSubstract( input, output ) {
+        let A = input.slice( 0, this.mode );
+        for( let i =1; i < this.mode; i++ ) {
+            A = varbase_sub( A, input.slice( i*this.mode, i*this.mode+this.mode ), this.base );
+        }
+        if( this._comp( A, 0, output, 0, this.mode ) )
+            return true;
+        return false;    
+    }
+
+    /*
+     * Test is mn = xmnx = output
+     */
+    _isShift( input, output ) {
+        if( this.mode == 2 ) {
+            return ( input[1] == output[0] && input[2] == output[1] );
+        }
+        return false;
+    }
+    
+    /*
+     * Test if mn = mxnx = output or mn = xmxn = output
+     */
+    _isMask( input, output ) {
+        for( let i =0; i < this.mode; i++ ) {
+            let match =true;
+            for( let j =0; j < this.mode; j++ ) {
+                match = match && (input[j*this.mode + i] == output[j]);
+            }
+            if( match ) return true;
+        }
+        return false;
     }
 
     /*

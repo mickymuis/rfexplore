@@ -9,7 +9,7 @@ class UIController {
     constructor( viewport ) {
         this.viewport =viewport;
         this.autoUpdate =true;
-        this.cluster = 'none';
+        this.cluster = /*'ttable2' */'none';
         this._viewmode ='circle';
         this._palette = [ '#ff5511', '#33ffcc', '#ffaa33', '#5E69FF' ]; 
         this._automaton =null;
