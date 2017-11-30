@@ -11,13 +11,13 @@ export default class Viewport {
         
         this.automaton = null;
         // fixme: remove
-        this.palette = [ '#ff5511', '#33eeff', '#ff33dd' ];
+        this.palette = [ '#ff5511', '#33eeff', '#ff33dd', '#386ebb' ];
 
         this.viewportWidth = this.container.offsetWidth;
         this.viewportHeight = this.container.offsetHeight;
 
         this._viewmode = 'folded'; // one of 'brick', 'diamond', 'circle', 'folded'
-        this._backgroundColor = '#777777'
+        this._backgroundColor = '#666666'
         this._scene = null;
         this._aspect =1.0;
         this._cameraPersp = null;
@@ -47,6 +47,7 @@ export default class Viewport {
             right: false        // Pivot is at right hand side
         };
         this._animation = {
+            alwaysClearGeometry: false,
             spin: true,
             animateDraw: true,
             drawType: 'rows', //  one of 'rows', 'ordered'
@@ -110,20 +111,20 @@ export default class Viewport {
 
         // Setup lights for the 3d view
         let lights = this._lights;
-        lights[0] = new THREE.AmbientLight( 0x13162B, 4 );
+        lights[0] = new THREE.AmbientLight( 0x151515, 3 );
         lights[0].position.set( 0, 0, 0 );
         lights[0].target = new THREE.Vector3( 0, 0, 0 );
         this._scene.add( lights[0] );
         
-        lights[1] = new THREE.DirectionalLight( 0xEDE2C7 );
+        lights[1] = new THREE.DirectionalLight( 0xEDE2A7 );
         lights[1].position.set( 10, 10, 10 );
         this._scene.add( lights[1] );
         
-        lights[2] = new THREE.DirectionalLight( 0xC7E8ED );
+        lights[2] = new THREE.DirectionalLight( 0xC7E8AD );
         lights[2].position.set( 0, -10, -10 );
         this._scene.add( lights[2] );
         
-        lights[3] = new THREE.DirectionalLight( 0xC8D9C8 );
+        lights[3] = new THREE.DirectionalLight( 0xC8D9A8 );
         lights[3].position.set( -10, 10, 0 );
         this._scene.add( lights[3] );
         
@@ -177,6 +178,9 @@ export default class Viewport {
 
     set animateDraw( b ) { this._animation.animateDraw =b; }
     get animateDraw() { return this._animation.animateDraw; }
+
+    set alwaysClearGeometry( b ) { this._animation.alwaysClearGeometry =b; }
+    get alwaysClearGeometry() { return this._animation.alwaysClearGeometry; }
     
     set backgroundColor( str ) {
         this._backgroundColor = str;
@@ -222,7 +226,8 @@ export default class Viewport {
                 this._updateCells();
         }
         if( this._animation.animateDraw ) {
-            this._updateCells( true );
+            if( this._animation.alwaysClearGeometry )
+                this._updateCells( true );
             this._animation.node = this.automaton.first(); this._animation.row =0;
             this._animation.drawDone = false;
         }
@@ -463,8 +468,8 @@ export default class Viewport {
             M.template_size = template.getAttribute( 'position' ).array.length; 
         }
         else {
-            material = new THREE.MeshStandardMaterial( {side: THREE.DoubleSide, vertexColors: THREE.VertexColors, metalness: 0 } );
-            template = new THREE.SphereBufferGeometry( 1.0, 8, 8 );
+            material = new THREE.MeshStandardMaterial( {side: THREE.DoubleSide, vertexColors: THREE.VertexColors, metalness: 0, roughness: 1 } );
+            template = new THREE.SphereBufferGeometry( 1.1, 8, 8 );
             template = template.toNonIndexed();
             M.template_size = template.getAttribute( 'position' ).array.length; 
         }
@@ -504,7 +509,7 @@ export default class Viewport {
             M.offset += positions.length;
         };
 
-        let foldedPosition = function( row, col, width, inputLength, right, mode, noY =false ) {
+        let foldedPosition = function( row, col, width, inputLength, right, mode, flat =false ) {
             // The pivot position determines where the rows start
             //let coneCol = right ? (width-1) - col : col;
             // Map the `triangle row' onto the `diagonal row'
@@ -524,7 +529,7 @@ export default class Viewport {
                 p.x = Math.cos( phi ) * radius;
                 p.z = Math.sin( phi ) * radius;
 
-                p.y = -coneRow*2 - ((fold && !noY) ? 2 * fold_offset : 0);
+                p.y = -coneRow*2 - ((fold && !flat) ? 2 * fold_offset : 0);
                 return p;
             }
             return new Array( calcPosition( 0 ), calcPosition( 1 ) );

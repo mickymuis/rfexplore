@@ -4,6 +4,7 @@ import Menubar from "./menubar.js";
 import equals from "./value_equals.js";
 import Texteditor from "./texteditor.js";
 import TTable2 from "./ttable.js";
+import DatGUIPresets from "./presets.js";
 
 class UIController {
     constructor( viewport ) {
@@ -11,7 +12,8 @@ class UIController {
         this.autoUpdate =true;
         this.cluster = /*'ttable2' */'none';
         this._viewmode ='circle';
-        this._palette = [ '#ff5511', '#33ffcc', '#ffaa33', '#5E69FF' ]; 
+        this._palette = [ '#ff8e10', '#33ffcc', '#3c9872', '#386ebb' ]; 
+        //this._palette = [ '#ff5511', '#33ffcc', '#ffaa33', '#5E69FF' ]; 
         this._automaton =null;
         this._oldopts = null;
         this._opts = { // Options to Automaton constructor
@@ -244,7 +246,9 @@ class App {
 
     }
     setupToolbox() {
-        this.toolbox = new dat.GUI();
+        this.toolbox = new dat.GUI( { load: DatGUIPresets, preset: "Default" } );
+        this.toolbox.remember( this.controller  );
+        this.toolbox.remember( this.viewport );
 
         // Automaton toolbox
         let f_a = this.toolbox.addFolder( 'Automaton' );
@@ -281,8 +285,10 @@ class App {
         f_r.add( this.controller, 'autoUpdate' ).name( 'Auto-update' );
         f_r.add( this.viewport, 'animateSpin' ).name( 'Spin' );
         f_r.add( this.viewport, 'animateDraw' ).name( 'Animate draw' );
+        f_r.add( this.viewport, 'alwaysClearGeometry' ).name( 'Clear cells' );
         f_r.add( this.viewport, 'animateDrawType', { Rows: 'rows', Ordered: 'ordered' } ).name( 'Draw type' );
         f_r.add( this.controller, 'render' ).name( 'Render' );
+
     }
 }
 

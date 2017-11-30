@@ -132,6 +132,7 @@ margin: 0; padding: 0;
     background-color: #777777;
     opacity: 0.5;
     z-index: 20;
+    transition: opacity 0.2s linear 0.2s;
 }
 
 .texteditor-container {
@@ -144,6 +145,7 @@ margin: 0; padding: 0;
     padding: 15px;
     background-color: #e8e8e8;
     z-index: 21;
+    border: 1px solid black;
 }
 
 .texteditor-container .wrapper {

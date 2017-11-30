@@ -27,9 +27,15 @@
     background: #fafafa;
     border-bottom: 1px solid #ddd;
 }
+
+.dg li.save-row {
+    height: auto !important;
+}
  
 .dg li.save-row .button {
     text-shadow: none !important;
+    box-shadow: 0 -1px 0 #666;
+    background-color: #999 !important;
 }
 
 .dg li.title {

@@ -101,6 +101,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	var _ttable2 = _interopRequireDefault(_ttable);
 	
+	var _presets = __webpack_require__(8);
+	
+	var _presets2 = _interopRequireDefault(_presets);
+	
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 	
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -115,7 +119,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this.autoUpdate = true;
 	        this.cluster = /*'ttable2' */'none';
 	        this._viewmode = 'circle';
-	        this._palette = ['#ff5511', '#33ffcc', '#ffaa33', '#5E69FF'];
+	        this._palette = ['#ff8e10', '#33ffcc', '#3c9872', '#386ebb'];
+	        //this._palette = [ '#ff5511', '#33ffcc', '#ffaa33', '#5E69FF' ]; 
 	        this._automaton = null;
 	        this._oldopts = null;
 	        this._opts = { // Options to Automaton constructor
@@ -442,7 +447,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	    App.prototype.setupToolbox = function setupToolbox() {
 	        var _this4 = this;
 	
-	        this.toolbox = new dat.GUI();
+	        this.toolbox = new dat.GUI({ load: _presets2.default, preset: "Default" });
+	        this.toolbox.remember(this.controller);
+	        this.toolbox.remember(this.viewport);
 	
 	        // Automaton toolbox
 	        var f_a = this.toolbox.addFolder('Automaton');
@@ -485,6 +492,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        f_r.add(this.controller, 'autoUpdate').name('Auto-update');
 	        f_r.add(this.viewport, 'animateSpin').name('Spin');
 	        f_r.add(this.viewport, 'animateDraw').name('Animate draw');
+	        f_r.add(this.viewport, 'alwaysClearGeometry').name('Clear cells');
 	        f_r.add(this.viewport, 'animateDrawType', { Rows: 'rows', Ordered: 'ordered' }).name('Draw type');
 	        f_r.add(this.controller, 'render').name('Render');
 	    };
@@ -873,13 +881,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	        this.automaton = null;
 	        // fixme: remove
-	        this.palette = ['#ff5511', '#33eeff', '#ff33dd'];
+	        this.palette = ['#ff5511', '#33eeff', '#ff33dd', '#386ebb'];
 	
 	        this.viewportWidth = this.container.offsetWidth;
 	        this.viewportHeight = this.container.offsetHeight;
 	
 	        this._viewmode = 'folded'; // one of 'brick', 'diamond', 'circle', 'folded'
-	        this._backgroundColor = '#777777';
+	        this._backgroundColor = '#666666';
 	        this._scene = null;
 	        this._aspect = 1.0;
 	        this._cameraPersp = null;
@@ -909,6 +917,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	            right: false // Pivot is at right hand side
 	        };
 	        this._animation = {
+	            alwaysClearGeometry: false,
 	            spin: true,
 	            animateDraw: true,
 	            drawType: 'rows', //  one of 'rows', 'ordered'
@@ -975,20 +984,20 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	        // Setup lights for the 3d view
 	        var lights = this._lights;
-	        lights[0] = new THREE.AmbientLight(0x13162B, 4);
+	        lights[0] = new THREE.AmbientLight(0x151515, 3);
 	        lights[0].position.set(0, 0, 0);
 	        lights[0].target = new THREE.Vector3(0, 0, 0);
 	        this._scene.add(lights[0]);
 	
-	        lights[1] = new THREE.DirectionalLight(0xEDE2C7);
+	        lights[1] = new THREE.DirectionalLight(0xEDE2A7);
 	        lights[1].position.set(10, 10, 10);
 	        this._scene.add(lights[1]);
 	
-	        lights[2] = new THREE.DirectionalLight(0xC7E8ED);
+	        lights[2] = new THREE.DirectionalLight(0xC7E8AD);
 	        lights[2].position.set(0, -10, -10);
 	        this._scene.add(lights[2]);
 	
-	        lights[3] = new THREE.DirectionalLight(0xC8D9C8);
+	        lights[3] = new THREE.DirectionalLight(0xC8D9A8);
 	        lights[3].position.set(-10, 10, 0);
 	        this._scene.add(lights[3]);
 	
@@ -1047,7 +1056,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	            if (!this._animation.animateDraw) this._updateCells();
 	        }
 	        if (this._animation.animateDraw) {
-	            this._updateCells(true);
+	            if (this._animation.alwaysClearGeometry) this._updateCells(true);
 	            this._animation.node = this.automaton.first();this._animation.row = 0;
 	            this._animation.drawDone = false;
 	        }
@@ -1288,8 +1297,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	            M.template_size = template.getAttribute('position').array.length;
 	        } else {
-	            material = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, vertexColors: THREE.VertexColors, metalness: 0 });
-	            template = new THREE.SphereBufferGeometry(1.0, 8, 8);
+	            material = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, vertexColors: THREE.VertexColors, metalness: 0, roughness: 1 });
+	            template = new THREE.SphereBufferGeometry(1.1, 8, 8);
 	            template = template.toNonIndexed();
 	            M.template_size = template.getAttribute('position').array.length;
 	        }
@@ -1328,7 +1337,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        };
 	
 	        var foldedPosition = function foldedPosition(row, col, width, inputLength, right, mode) {
-	            var noY = arguments.length > 6 && arguments[6] !== undefined ? arguments[6] : false;
+	            var flat = arguments.length > 6 && arguments[6] !== undefined ? arguments[6] : false;
 	
 	            // The pivot position determines where the rows start
 	            //let coneCol = right ? (width-1) - col : col;
@@ -1349,7 +1358,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	                p.x = Math.cos(phi) * radius;
 	                p.z = Math.sin(phi) * radius;
 	
-	                p.y = -coneRow * 2 - (fold && !noY ? 2 * fold_offset : 0);
+	                p.y = -coneRow * 2 - (fold && !flat ? 2 * fold_offset : 0);
 	                return p;
 	            };
 	            return new Array(calcPosition(0), calcPosition(1));
@@ -1469,6 +1478,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	        },
 	        get: function get() {
 	            return this._animation.animateDraw;
+	        }
+	    }, {
+	        key: "alwaysClearGeometry",
+	        set: function set(b) {
+	            this._animation.alwaysClearGeometry = b;
+	        },
+	        get: function get() {
+	            return this._animation.alwaysClearGeometry;
 	        }
 	    }, {
 	        key: "backgroundColor",
@@ -2330,6 +2347,145 @@ return /******/ (function(modules) { // webpackBootstrap
 	}();
 	
 	exports.default = TTable2;
+	module.exports = exports["default"];
+
+/***/ },
+/* 8 */
+/***/ function(module, exports) {
+
+	"use strict";
+	
+	exports.__esModule = true;
+	var DatGUIPresets = {
+	  "preset": "2.4.4234186713",
+	  "remembered": {
+	    "Default": {
+	      "0": {
+	        "mode": 2,
+	        "base": 2,
+	        "rule": 6,
+	        "folds": 20,
+	        "foldToRight": false,
+	        "inputSize": 8,
+	        "viewmode": "circle",
+	        "cluster": "none",
+	        "color0": "#ff8e10",
+	        "color1": "#33ffcc",
+	        "color2": "#3c9872",
+	        "color3": "#386ebb",
+	        "autoUpdate": true
+	      },
+	      "1": {
+	        "backgroundColor": "#666666",
+	        "animateSpin": true,
+	        "animateDraw": true,
+	        "alwaysClearGeometry": false,
+	        "animateDrawType": "rows"
+	      }
+	    },
+	    "2.3.11823 Cluster": {
+	      "0": {
+	        "mode": 2,
+	        "base": 3,
+	        "rule": 11823,
+	        "folds": 79,
+	        "foldToRight": false,
+	        "inputSize": 8,
+	        "viewmode": "circle",
+	        "cluster": "ttable2",
+	        "color0": "#ff8e10",
+	        "color1": "#33ffcc",
+	        "color2": "#3c9872",
+	        "color3": "#386ebb",
+	        "autoUpdate": true
+	      },
+	      "1": {
+	        "backgroundColor": "#666666",
+	        "animateSpin": true,
+	        "animateDraw": true,
+	        "alwaysClearGeometry": false,
+	        "animateDrawType": "rows"
+	      }
+	    },
+	    "2.4.2440396980": {
+	      "0": {
+	        "mode": 2,
+	        "base": 4,
+	        "rule": 2440396980,
+	        "folds": 300,
+	        "foldToRight": false,
+	        "inputSize": 10,
+	        "viewmode": "stack",
+	        "cluster": "none",
+	        "color0": "#ff8e10",
+	        "color1": "#33ffcc",
+	        "color2": "#3c9872",
+	        "color3": "#386ebb",
+	        "autoUpdate": true
+	      },
+	      "1": {
+	        "backgroundColor": "#666666",
+	        "animateSpin": true,
+	        "animateDraw": false,
+	        "alwaysClearGeometry": false,
+	        "animateDrawType": "rows"
+	      }
+	    },
+	    "2.4.4234186713": {
+	      "0": {
+	        "mode": 2,
+	        "base": 4,
+	        "rule": 4234186713,
+	        "folds": 400,
+	        "foldToRight": false,
+	        "inputSize": 10,
+	        "viewmode": "circle",
+	        "cluster": "none",
+	        "color0": "#ff8e10",
+	        "color1": "#33ffcc",
+	        "color2": "#3c9872",
+	        "color3": "#386ebb",
+	        "autoUpdate": true
+	      },
+	      "1": {
+	        "backgroundColor": "#666666",
+	        "animateSpin": true,
+	        "animateDraw": false,
+	        "alwaysClearGeometry": false,
+	        "animateDrawType": "rows"
+	      }
+	    }
+	  },
+	  "closed": false,
+	  "folders": {
+	    "Automaton": {
+	      "preset": "Default",
+	      "closed": false,
+	      "folders": {}
+	    },
+	    "Visualisation": {
+	      "preset": "Default",
+	      "closed": false,
+	      "folders": {}
+	    },
+	    "Clustering": {
+	      "preset": "Default",
+	      "closed": false,
+	      "folders": {}
+	    },
+	    "Colors": {
+	      "preset": "Default",
+	      "closed": true,
+	      "folders": {}
+	    },
+	    "Render": {
+	      "preset": "Default",
+	      "closed": false,
+	      "folders": {}
+	    }
+	  }
+	};
+	exports.default = DatGUIPresets;
 	module.exports = exports["default"];
 
 /***/ }
