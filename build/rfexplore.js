@@ -243,7 +243,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	        editor.create();
 	        editor.text = JSON.stringify(this._opts);
 	        editor.onDone = function (json) {
-	            _this2._opts = JSON.parse(json);_this2.update();
+	            _this2._opts = JSON.parse(json);
+	            _this2._emit('rule', _this2._opts.rule);
+	            _this2._emit('folds', _this2._opts.folds);
+	            _this2.update();
+	            _this2._emit('maxrules', _automaton2.default.maxRules(_this2._opts.base, _this2._opts.mode));
 	        };
 	    };
 	
@@ -2357,7 +2361,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	exports.__esModule = true;
 	var DatGUIPresets = {
-	  "preset": "2.4.4234186713",
+	  "preset": "2.3.12242",
 	  "remembered": {
 	    "Default": {
 	      "0": {
@@ -2440,6 +2444,54 @@ return /******/ (function(modules) { // webpackBootstrap
 	        "foldToRight": false,
 	        "inputSize": 10,
 	        "viewmode": "circle",
+	        "cluster": "none",
+	        "color0": "#ff8e10",
+	        "color1": "#33ffcc",
+	        "color2": "#3c9872",
+	        "color3": "#386ebb",
+	        "autoUpdate": true
+	      },
+	      "1": {
+	        "backgroundColor": "#666666",
+	        "animateSpin": true,
+	        "animateDraw": false,
+	        "alwaysClearGeometry": false,
+	        "animateDrawType": "rows"
+	      }
+	    },
+	    "2.3.12897": {
+	      "0": {
+	        "mode": 2,
+	        "base": 3,
+	        "rule": 12897,
+	        "folds": 157,
+	        "foldToRight": false,
+	        "inputSize": 8,
+	        "viewmode": "folded",
+	        "cluster": "none",
+	        "color0": "#ff8e10",
+	        "color1": "#33ffcc",
+	        "color2": "#3c9872",
+	        "color3": "#386ebb",
+	        "autoUpdate": true
+	      },
+	      "1": {
+	        "backgroundColor": "#666666",
+	        "animateSpin": true,
+	        "animateDraw": false,
+	        "alwaysClearGeometry": false,
+	        "animateDrawType": "rows"
+	      }
+	    },
+	    "2.3.12242": {
+	      "0": {
+	        "mode": 2,
+	        "base": 3,
+	        "rule": 12242,
+	        "folds": 135,
+	        "foldToRight": false,
+	        "inputSize": 16,
+	        "viewmode": "folded",
 	        "cluster": "none",
 	        "color0": "#ff8e10",
 	        "color1": "#33ffcc",

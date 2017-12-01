@@ -176,7 +176,13 @@ class UIController {
         let editor = new Texteditor();
         editor.create();
         editor.text = JSON.stringify( this._opts );
-        editor.onDone = (json)=>{ this._opts = JSON.parse( json ); this.update(); };
+        editor.onDone = (json)=>{ 
+            this._opts = JSON.parse( json ); 
+            this._emit( 'rule', this._opts.rule );
+            this._emit( 'folds', this._opts.folds );
+            this.update(); 
+            this._emit( 'maxrules', Automaton.maxRules( this._opts.base, this._opts.mode ) );
+            };
     }
 
     _emit( event, data ) {
