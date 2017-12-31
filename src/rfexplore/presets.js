@@ -1,6 +1,6 @@
 var DatGUIPresets = 
 {
-  "preset": "2.3.12242",
+  "preset": "Default",
   "remembered": {
     "Default": {
       "0": {
@@ -50,12 +50,12 @@ var DatGUIPresets =
         "animateDrawType": "rows"
       }
     },
-    "2.4.2440396980": {
+    "2.4.1854570315": {
       "0": {
         "mode": 2,
         "base": 4,
-        "rule": 2440396980,
-        "folds": 300,
+        "rule": 1854570315,
+        "folds": 200,
         "foldToRight": false,
         "inputSize": 10,
         "viewmode": "stack",
@@ -74,12 +74,12 @@ var DatGUIPresets =
         "animateDrawType": "rows"
       }
     },
-    "2.4.4234186713": {
+    "2.4.60780582": {
       "0": {
         "mode": 2,
         "base": 4,
-        "rule": 4234186713,
-        "folds": 400,
+        "rule": 60780582,
+        "folds": 300,
         "foldToRight": false,
         "inputSize": 10,
         "viewmode": "circle",
@@ -98,11 +98,11 @@ var DatGUIPresets =
         "animateDrawType": "rows"
       }
     },
-    "2.3.12897": {
+    "2.3.6785": {
       "0": {
         "mode": 2,
         "base": 3,
-        "rule": 12897,
+        "rule": 6785,
         "folds": 157,
         "foldToRight": false,
         "inputSize": 8,
@@ -122,11 +122,11 @@ var DatGUIPresets =
         "animateDrawType": "rows"
       }
     },
-    "2.3.12242": {
+    "2.3.7440": {
       "0": {
         "mode": 2,
         "base": 3,
-        "rule": 12242,
+        "rule": 7440,
         "folds": 135,
         "foldToRight": false,
         "inputSize": 16,

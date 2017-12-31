@@ -80,12 +80,19 @@ export default class Automaton {
             tt[i] = 0;
 
         let decimal = rule; // Rule in base 10
-        let i = rulesize -1;
+        // Editted to be conguent with Wolfram Code
+        let i = 0;
+        while( i < rulesize && decimal > 0 ) {
+            tt[i] = decimal % base;
+            decimal = Math.floor( decimal / base );
+            i++;
+        }
+        /*let i = rulesize -1;
         while( i >= 0 && decimal > 0 ) {
             tt[i] = decimal % base;
             decimal = Math.floor( decimal / base );
             i--;
-        }
+        }*/
         return tt;
     }
 
